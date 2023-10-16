@@ -1,0 +1,248 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="リソース ファイル">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="リソース ファイル\extra">
+      <UniqueIdentifier>{bfdca085-939e-4c22-831c-b8eab41b4440}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="リソース ファイル\engine">
+      <UniqueIdentifier>{e9b3e69c-bd87-41b1-947e-68da1be9443a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="リソース ファイル\engine\classic-engine">
+      <UniqueIdentifier>{669f832c-7d68-44b0-aff9-048ac0923290}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="リソース ファイル\engine\help-mate-engine">
+      <UniqueIdentifier>{a4d89bd4-6529-49a7-9143-b0d2dff4684c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="リソース ファイル\engine\mini-engine">
+      <UniqueIdentifier>{8d0d3c85-56bf-4b6c-aab6-7e5d30f44247}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="リソース ファイル\engine\nano-engine">
+      <UniqueIdentifier>{96d39d2d-8f79-4886-aee4-dca2a18a8ed5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="リソース ファイル\engine\user-engine">
+      <UniqueIdentifier>{6cab9abd-d0e7-4497-bbe3-67a203fe5dee}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="リソース ファイル\engine\random-player-engine">
+      <UniqueIdentifier>{bdf05885-9d14-44cb-b571-c77256d741ba}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="リソース ファイル\engine\local-game-server">
+      <UniqueIdentifier>{87ce55d3-78de-45c8-a6b3-a74a54ef2d0b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="リソース ファイル\engine\mate-engine">
+      <UniqueIdentifier>{4848b7b4-f5f3-4fa3-84f5-a5dd21e63f3c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="リソース ファイル\eval">
+      <UniqueIdentifier>{74e286a5-5565-4995-9fc2-737328172971}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="exe">
+      <UniqueIdentifier>{a09b95c2-88ed-401e-ab31-7eb93f8fc490}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="doc">
+      <UniqueIdentifier>{8bb34244-8e89-49f6-a303-c043ef5d8647}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="exe\book">
+      <UniqueIdentifier>{31783e68-60c1-4b07-a404-12463d7c1e30}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="exe\eval">
+      <UniqueIdentifier>{022b52fb-a082-4f1e-9418-bfbc59a1c528}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="リソース ファイル\engine\nano-plus-engine">
+      <UniqueIdentifier>{f3ba1c3a-285c-4fbb-b041-1a46902f2f8c}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="evaluate.h">
+      <Filter>リソース ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="bitboard.h">
+      <Filter>リソース ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="position.h">
+      <Filter>リソース ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="shogi.h">
+      <Filter>リソース ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="search.h">
+      <Filter>リソース ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="thread.h">
+      <Filter>リソース ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="misc.h">
+      <Filter>リソース ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="extra\all.h">
+      <Filter>リソース ファイル\extra</Filter>
+    </ClInclude>
+    <ClInclude Include="extra\key128.h">
+      <Filter>リソース ファイル\extra</Filter>
+    </ClInclude>
+    <ClInclude Include="extra\mate1ply.h">
+      <Filter>リソース ファイル\extra</Filter>
+    </ClInclude>
+    <ClInclude Include="extra\bitop.h">
+      <Filter>リソース ファイル\extra</Filter>
+    </ClInclude>
+    <ClInclude Include="extra\config.h">
+      <Filter>リソース ファイル\extra</Filter>
+    </ClInclude>
+    <ClInclude Include="extra\long_effect.h">
+      <Filter>リソース ファイル\extra</Filter>
+    </ClInclude>
+    <ClInclude Include="tt.h">
+      <Filter>リソース ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\help-mate-engine\help_mate_engine.h">
+      <Filter>リソース ファイル\engine\help-mate-engine</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\mate-engine\mate_engine.h">
+      <Filter>リソース ファイル\engine\mate-engine</Filter>
+    </ClInclude>
+    <ClInclude Include="extra\book.h">
+      <Filter>リソース ファイル\extra</Filter>
+    </ClInclude>
+    <ClInclude Include="extra\macros.h">
+      <Filter>リソース ファイル\extra</Filter>
+    </ClInclude>
+    <ClInclude Include="move_picker.h">
+      <Filter>リソース ファイル</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="movegen.cpp">
+      <Filter>リソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="bitboard.cpp">
+      <Filter>リソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="shogi.cpp">
+      <Filter>リソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="position.cpp">
+      <Filter>リソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="usi.cpp">
+      <Filter>リソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="thread.cpp">
+      <Filter>リソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="misc.cpp">
+      <Filter>リソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="extra\test_cmd.cpp">
+      <Filter>リソース ファイル\extra</Filter>
+    </ClCompile>
+    <ClCompile Include="extra\mate1ply.cpp">
+      <Filter>リソース ファイル\extra</Filter>
+    </ClCompile>
+    <ClCompile Include="extra\long_effect.cpp">
+      <Filter>リソース ファイル\extra</Filter>
+    </ClCompile>
+    <ClCompile Include="tt.cpp">
+      <Filter>リソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\classic-engine\classic_search.cpp">
+      <Filter>リソース ファイル\engine\classic-engine</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\mini-engine\mini_search.cpp">
+      <Filter>リソース ファイル\engine\mini-engine</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\nano-engine\nano_search.cpp">
+      <Filter>リソース ファイル\engine\nano-engine</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\random-player-engine\random_player_search.cpp">
+      <Filter>リソース ファイル\engine\random-player-engine</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\local-game-server\local-game-server.cpp">
+      <Filter>リソース ファイル\engine\local-game-server</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\mate-engine\mate_engine.cpp">
+      <Filter>リソース ファイル\engine\mate-engine</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\help-mate-engine\help_mate_engine.cpp">
+      <Filter>リソース ファイル\engine\help-mate-engine</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\user-engine\user-engine.cpp">
+      <Filter>リソース ファイル\engine\user-engine</Filter>
+    </ClCompile>
+    <ClCompile Include="extra\see.cpp">
+      <Filter>リソース ファイル\extra</Filter>
+    </ClCompile>
+    <ClCompile Include="extra\bitop.cpp">
+      <Filter>リソース ファイル\extra</Filter>
+    </ClCompile>
+    <ClCompile Include="extra\book.cpp">
+      <Filter>リソース ファイル\extra</Filter>
+    </ClCompile>
+    <ClCompile Include="eval\evaluate_kpp.cpp">
+      <Filter>リソース ファイル\eval</Filter>
+    </ClCompile>
+    <ClCompile Include="eval\evaluate_bona_piece.cpp">
+      <Filter>リソース ファイル\eval</Filter>
+    </ClCompile>
+    <ClCompile Include="eval\evaluate_no_eval.cpp">
+      <Filter>リソース ファイル\eval</Filter>
+    </ClCompile>
+    <ClCompile Include="eval\evaluate_material.cpp">
+      <Filter>リソース ファイル\eval</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\nano-plus-engine\nano_plus_search.cpp">
+      <Filter>リソース ファイル\engine\nano-plus-engine</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="..\docs\USI拡張コマンド.txt">
+      <Filter>doc</Filter>
+    </Text>
+    <Text Include="..\docs\更新履歴.txt">
+      <Filter>doc</Filter>
+    </Text>
+    <Text Include="..\docs\解説.txt">
+      <Filter>doc</Filter>
+    </Text>
+    <Text Include="..\exe\YaneuraOu-nano_ja.txt">
+      <Filter>exe</Filter>
+    </Text>
+    <Text Include="..\exe\YaneuraOu-nano-readme.txt">
+      <Filter>exe</Filter>
+    </Text>
+    <Text Include="..\exe\eval\readme.txt">
+      <Filter>exe\eval</Filter>
+    </Text>
+    <Text Include="..\exe\YaneuraOu-nano-plus_ja.txt">
+      <Filter>exe</Filter>
+    </Text>
+    <Text Include="..\exe\YaneuraOu-nano-plus-readme.txt">
+      <Filter>exe</Filter>
+    </Text>
+    <Text Include="..\exe\YaneuraOu-mini_ja.txt">
+      <Filter>exe</Filter>
+    </Text>
+    <Text Include="..\exe\YaneuraOu-mini-readme.txt">
+      <Filter>exe</Filter>
+    </Text>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\README.md">
+      <Filter>doc</Filter>
+    </None>
+    <None Include="..\exe\YaneuraOu-nano.exe">
+      <Filter>exe</Filter>
+    </None>
+    <None Include="..\exe\book\standard_book.db">
+      <Filter>exe\book</Filter>
+    </None>
+    <None Include="..\exe\YaneuraOu-nano-plus.exe">
+      <Filter>exe</Filter>
+    </None>
+    <None Include="..\exe\YaneuraOu-mini.exe">
+      <Filter>exe</Filter>
+    </None>
+  </ItemGroup>
+</Project>

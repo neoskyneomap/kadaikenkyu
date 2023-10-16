@@ -1,0 +1,3148 @@
+﻿
+やねうら王 更新履歴
+
+気が向いたらやるリスト
+- [ ] ・やねうら王classicに定跡の選択機能入れる。
+- [ ] ・Recaptureのオーダリング考える。
+
+
+■ 2016/03/01 V2.15
+
+・比較実験用に古いStockfishの置換表のコード持ってきた。
+	sfen lns3snl/1r1gk1gb1/pppp1p3/6pRp/4pN3/6P1P/PPPPPP3/1B3S3/LNSGKG2L w Pp 20
+	→　insert_pvなんとかで落ちた。
+	勝率めっちゃ悪い。詰みを読みきったあと、逆転負け。何これ。
+	insert_pv絡みで何か壊しているのか。そんな馬鹿な…。
+	probe()のときにgenerationをrefreshするように追加したが、関係なかった。何なのこれ。
+	見たことのない症例。
+
+
+■ 2016/03/01 V2.14
+
+・classic
+
+        // 捕獲から逃れるための指し手に関してはreduction量を減らしてやる。
+        // 捕獲から逃れるとそれによって局面の優劣が反転することが多いためである。
+
+        if (r
+          && !(move & MOVE_PROMOTE)
+          && pos.effected_to(~us,move_from(move))) // 敵の利きがこの移動元の駒にあるか
+          r = std::max(DEPTH_ZERO, r - ONE_PLY);
+
+		  こういう枝刈り(枝刈らない？)を入れてみた。
+
+			50.0%	
+			#82
+			やねうら王classic V214
+			捕獲から逃れる手のreduction減らす, 1スレッド、0.1秒設定
+			#0
+			やねうら王classic V213
+			悪いhistoryにreduction追加, 1スレッド、0.1秒設定
+
+			185-13-185(52.1% R0.0)	
+
+	→　効果乏しい。コメントアウトしておく。
+
+	V2.14a
+	singularのmargin調整してみる。
+	        Value rBeta = ttValue - (param1 + 1) * depth / ONE_PLY;   // margin = 2 * depth / ONE_PLY
+	param1 = 0..4ぐらいで。
+
+			47.1%	49.0%	51.2%	40.6%	50.5%	
+			#83
+			やねうら王classic V214a
+			singular margin=(param1+1)*depth, 1スレッド、0.1秒設定
+			#0
+			やねうら王classic V213
+			悪いhistoryにreduction追加, 1スレッド、0.1秒設定
+
+			140-8-157(85.2% R-19.9)	98-8-102(63.8% R-6.9)	103-7-98(33.6% R8.6)	80-11-117(99.7% R-66.0)	100-10-98(41.6% R3.5)	
+	
+		X=2 だからmargin = depth*15/ONE_PLYで最大になっているがあまり他と差がないので
+		singularは保留しておく。
+
+	・npsそもそもいつこんなに下がったのか。
+	V1.93で1割ほどダウン
+	V2.07で1割ほどダウン。→静止探索でfutility入れたからか…。
+
+	・枝刈り一通り入れたのに、予想外に弱いな。評価値の差分計算が間違ってないか検証する。
+	→　差分計算は合ってた。
+
+	・やねうら王2015とやってみる。
+	やねうら王1手0.1秒固定で..
+	
+			100.0%	0.0%	0.0%	0.0%	0.0%	
+			#84
+			やねうら王2015
+			1スレッド、0.1秒設定
+			#0
+			やねうら王classic V213
+			悪いhistoryにreduction追加, 1スレッド、0.1秒設定
+
+			100-0-0(0.0% R∞)	0-0-0(100.0% RNaN)	0-0-0(100.0% RNaN)	0-0-0(100.0% RNaN)	0-0-0(100.0% RNaN)	
+
+	100戦100敗だった。なにこれ。やはり評価関数か何かがおかしいとしか考えられない。
+	evalstat同じなのにeval違うだと…？
+
+	isready
+	position startpos
+	eval
+	これが正しいのか。
+	positionをセットしたタイミングでevalの全計算をするが、そのときに評価関数が読み込まれていないとまずくて…。
+
+	悔しいがevalも差分も完璧なのに…。
+	1スレッドで負けてるから、lazy SMP悪くないしな。
+	やねうら王2015とソース見比べるしかないな。
+
+
+■ 2016/03/01 V2.13
+
+・classic 
+        // historyの値に応じて指し手のreduction量を増減する。
+        int rHist = (thisThread->history.get(pos.piece_on(move_to(move)),move_to(move))
+          + cmh.get(pos.piece_on(move_to(move)),move_to(move))) / 14980;
+        r = std::max(DEPTH_ZERO, r - rHist * ONE_PLY);
+
+		53.2%	
+		#81
+		やねうら王classic V213
+		悪いhistoryにreduction追加, 1スレッド、0.1秒設定
+		#0
+		やねうら王classic V212
+		悪いhistoryにreduction追加, 1スレッド、0.1秒設定
+
+		201-15-177(9.9% R22.1)	
+
+	1回落ちた。なんで…。
+	sfen l3k2r1/p1g5l/1p1ss2g1/+b4pppp/2+bp5/2N2PPPP/+n1PPP2R1/2S1K4/4SG1NL w PN3plg 134
+	→　よくわからない。
+	local-server.exe
+	で対戦させておくか。
+	→  3PCで一晩回したが落ちなかった。前プロセスが悪さしてたのかな…。
+	
+・miniの最終とclassicと対戦させてみる。
+
+		55.5%	
+		#81
+		やねうら王classic V213
+		悪いhistoryにreduction追加, 1スレッド、0.1秒設定
+		#75
+		やねうら王mini V208
+		静止探索での駒得しないevasion枝刈り追加, 1スレッド、0.1秒設定
+
+		182-7-146(2.0% R38.3)	
+
+	あまり強くなっていないが、弱くもなっていないので良しとする。
+	もうちょっと強くなっているはずだったのだが…。
+
+
+
+■ 2016/03/01 V2.12
+
+・classic 悪いhistoryにreduction量を増やす枝刈り追加してみる。
+
+        // cut nodeや、historyの値が悪い指し手に対してはreduction量を増やす。
+        if ((!PvNode && cutNode)
+          || (thisThread->history.get(pos.piece_on(move_to(move)),move_to(move)) < VALUE_ZERO
+            && cmh.get(pos.piece_on(move_to(move)),move_to(move)) <= VALUE_ZERO))
+          r += ONE_PLY;
+
+
+			61.3%	
+			#80
+			やねうら王classic V212
+			悪いhistoryにreduction追加, 1スレッド、0.1秒設定
+			#0
+			やねうら王classic V208
+			静止探索での駒得しないevasion枝刈り追加, 1スレッド、0.1秒設定
+
+			92-1-58(0.2% R80.1)	
+
+
+■ 2016/03/01 V2.11
+
+・singularもっかい試す
+
+		46.0%	
+		#78
+		やねうら王classic V211
+		singular追加, 1スレッド、0.1秒設定
+		#0
+		やねうら王classic V208
+		静止探索での駒得しないevasion枝刈り追加, 1スレッド、0.1秒設定
+
+		426-33-501(99.4% R-28.2)	
+	→　どう見ても悪い。原因よく調べる。
+
+・Signals.stop、探索中にこれを調べるなら、Signals.stop.load(std::memory_order_relaxed)とすべき。修正。
+・Signals.stop、searchの前のほうでもやるように。
+・静止探索でpos.givesCheck()になっていたところ、givesCheckに修正。
+
+	V2.11a
+・fail lowを引き起こした直前のcounter moveに加点するようにした。
+・searchのなかにassertいくつか追加した。
+	sfen ln1gk3p/1rs1s4/p2ps1N+B+L/lp3p3/+Rn5P1/2G1PPPl1/3P5/P+b1G1S3/4KG3 b 4P3pn 79
+	静止探索でassertに引っかかった。
+	      ASSERT_LV3(-VALUE_INFINITE < value && value < VALUE_INFINITE);
+	おかしい…。
+	value == -32004
+	置換表に32004を書き込んだ奴がいる。
+
+	TTEntry::saveに次のassertを追加。
+    ASSERT_LV3((-VALUE_INFINITE < v && v < VALUE_INFINITE) || v == VALUE_NONE);
+
+      if (!(-VALUE_INFINITE + ss->ply < value && value < VALUE_INFINITE - ss->ply))
+      {
+        pos.do_move(move, st, givesCheck);
+        value = givesCheck ? -qsearch<NT, true>(pos, ss + 1, -beta, -alpha, depth - ONE_PLY)
+          : -qsearch<NT, false>(pos, ss + 1, -beta, -alpha, depth - ONE_PLY);
+
+        pos.undo_move(move);
+      }
+	こう書くと原因わかった。
+	draw scoreにvalue_from_tt()みたいな変換していないからか…。
+	連続王手での千日手での負け、詰みスコアより低くするのは違う気がするので
+	やはりvalue_from_ttみたいなことしないといけないのか。
+
+      // -----------------------
+      //     千日手等の検出
+      // -----------------------
+
+      auto draw_type = pos.is_repetition();
+      if (draw_type != REPETITION_NONE)
+        return value_from_tt(draw_value(draw_type, pos.side_to_move()), ss->ply);
+
+      // 最大手数を超えている、もしくは停止命令が来ている。
+      if (Signals.stop.load(std::memory_order_relaxed) || ss->ply >= MAX_PLY)
+        return value_from_tt(draw_value(REPETITION_DRAW, pos.side_to_move()),ss->ply);
+
+	こうだ。miniも同様の修正をしておく。
+
+
+■ 2016/02/29 V2.10
+
+・1手詰めのときmate_in(ply + 1)でないとおかしいのか。忘れてた。修正した。
+	この修正で弱くなっていないことを確認しておく。
+
+		48.5%	
+		#77
+		やねうら王classic V210
+		1手詰めスコア修正, 1スレッド、0.1秒設定
+		#0
+		やねうら王classic V208
+		静止探索での駒得しないevasion枝刈り追加, 1スレッド、0.1秒設定
+
+		199-14-211(74.0% R-10.2)	
+	→　たぶん弱くはなってなさげ。
+
+■ 2016/02/29 V2.09
+
+・エンジンごとにUSIのオプションが異なるから、
+	Option::init()でコールバックするべきか。
+		→　そうした。
+
+・やねうら王classicにNarrowBookのUSIオプション追加。
+
+・やねうら王mini、R2800程度と思われるのでドキュメント類、書き換えておく。
+
+・やねうら王classic、NarrowBookにしたものと対戦させてみる。
+	終局図までが同じになることが多々あってあまり意味があるとも思えないが…。
+	→　miniにもこの機能入れて、floodgateにはそれを投入する。
+
+		51.8%	
+		#76
+		やねうら王classic V209
+		NarrowBook有効, 1スレッド、0.1秒設定
+		#0
+		やねうら王classic V208
+		静止探索での駒得しないevasion枝刈り追加, 1スレッド、0.1秒設定
+
+		174-10-162(23.9% R12.4)	
+
+	あまり偏ってなかった。持ち時間が短いと序盤のミスを咎めるのが難しいからか…。
+	そもそも大悪手は含まれてないだろうしな…。
+
+
+■ 2016/02/29 V2.08
+
+・classicの静止探索で駒得しない王手回避と、なんやかや枝刈りするコード追加。
+      →　Detect non-capture evasions
+
+		62.9%	
+		#74
+		やねうら王classic V208
+		静止探索での駒得しないevasion枝刈り追加, 1スレッド、0.1秒設定
+		#0
+		やねうら王classic V207
+		静止探索でのfutility追加, 1スレッド、0.1秒設定
+
+		90-1-53(0.1% R92.0)	
+
+		よくはわからないが、とても効果があるみたい。
+		miniのほうもこの修正入れる。
+
+			64.1%	
+			#75
+			やねうら王mini V208
+			静止探索での駒得しないevasion枝刈り追加, 1スレッド、0.1秒設定
+			#73
+			やねうら王mini V207a
+			静止探索の1手詰め復活, 1スレッド、0.1秒設定
+
+			166-8-93(0.0% R100.7)	
+
+
+■ 2016/02/29 V2.07
+
+・classicの静止探索にfutility追加。
+
+	60.4%	
+	#71
+	やねうら王classic V207
+	静止探索でのfutility追加, 1スレッド、0.1秒設定
+	#0
+	やねうら王classic V206
+	futility at parent node3, 1スレッド、0.1秒設定
+
+	110-9-72(0.2% R73.6)	
+
+	→　これずいぶん効果がある。自己対局だからかも知れないが。
+
+	この枝刈りをminiに入れて、静止探索の一手詰めを削除するとどうなのか。
+
+		43.8%	
+		#72
+		やねうら王mini V207
+		静止探索のfutility追加。1手詰め削除, 1スレッド、0.1秒設定
+		#67
+		やねうら王mini V204b
+		miniから静止探索の1手詰めだけ復活, 1スレッド、0.1秒設定
+
+		81-6-104(96.1% R-43.4)	
+
+		1手詰めないと散々だな…。
+
+		V2.07a
+		→　miniの一手詰め戻す
+		これで2.04bに勝ち越すようなら、これで最終とする。
+
+			57.2%	
+			#73
+			やねうら王mini V207a
+			静止探索の1手詰め復活, 1スレッド、0.1秒設定
+			#67
+			やねうら王mini V204b
+			miniから静止探索の1手詰めだけ復活, 1スレッド、0.1秒設定
+
+			91-7-68(2.8% R50.6)	
+
+			弱くはなってなさそう。
+			→　exeフォルダのminiを差し替え	
+
+
+
+■ 2016/02/29 V2.06
+
+・classicに親nodeで負のSEE値を持つ指し手の枝刈りも入れてみる。
+
+        // 次の子nodeにおいて浅い深さになる場合、負のSSE値を持つ指し手の枝刈り
+        if (predictedDepth < 4 * ONE_PLY && pos.see_sign(move) < VALUE_ZERO)
+          continue;
+
+				56.1%	
+				#70
+				やねうら王classic V206
+				futility at parent node3, 1スレッド、0.1秒設定
+				#0
+				やねうら王classic V205a
+				futility at parent node2, 1スレッド、0.1秒設定
+
+				351-16-275(0.1% R42.4)	
+
+・qsearchにコメント追加。
+
+
+■ 2016/02/29 V2.05
+
+・classicに親nodeでのfutility追加。
+
+        // Futility pruning: 親nodeに関して
+        if (predictedDepth < 7 * ONE_PLY)
+        {
+          futilityValue = ss->staticEval + futility_margin(predictedDepth,pos.game_ply()) + param1 * 85;
+
+          if (futilityValue <= alpha)
+          {
+            bestValue = std::max(bestValue, futilityValue);
+            continue;
+          }
+        }
+		こうやってparam1 == 0..4ぐらいで前バージョンと対局させてみる。
+
+		46.0%	51.9%	55.4%	53.7%	54.5%	
+		#68
+		やねうら王classic V205
+		futility at parent node, 1スレッド、0.1秒設定
+		#0
+		やねうら王classic V204
+		classicにhistoryに基づく枝刈り追加, 1スレッド、0.1秒設定
+
+		144-7-169(92.9% R-27.8)	160-12-148(22.9% R13.5)	173-8-139(2.4% R38.0)	169-5-146(8.8% R25.4)	168-12-140(4.9% R31.7)	
+
+		V2.05a
+		X=2,すなわち170か。とりあえずそうしとく。
+		
+
+■ 2016/02/29 V2.04
+
+・classicにHistoryに基づいた枝刈り追加。
+
+		77.9%	
+		#64
+		やねうら王mini V203a
+		miniのほうmoveCountベースのfutility追加, 1スレッド、0.1秒設定
+		#0
+		やねうら王mini V202
+		singluar extension追加, 1スレッド、0.1秒設定
+
+		102-3-29(0.0% R218.5)	
+
+	V2.04a
+	・miniにこの枝刈り入れて、1手詰め、削除するとどうか。
+	各種枝刈りを入れると一手詰めをの有無が利いてくるのか…。そうか…。
+	
+		33.3%	
+		#66
+		やねうら王mini V204a
+		miniにhistoryに基づく枝刈り追加 mate削除, 1スレッド、0.1秒設定
+		#0
+		やねうら王mini V203
+		moveCountベースのfutility追加, 1スレッド、0.1秒設定
+
+		18-0-36(99.5% R-120.4)	
+
+	V2.04b
+	・miniから静止探索の1手詰めだけ復活
+
+		51.2%	
+		#67
+		やねうら王mini V204b
+		miniから静止探索の1手詰めだけ復活, 1スレッド、0.1秒設定
+		#0
+		やねうら王mini V203
+		moveCountベースのfutility追加, 1スレッド、0.1秒設定
+
+		84-1-80(34.8% R8.5)	
+
+	→　前のバージョンと互角ぐらいっぽいのでこれですっきり。
+
+
+■ 2016/02/29 V2.03
+
+・classicにmoveCountベースのfutility追加
+
+			85.1%	
+			#63
+			やねうら王mini V203
+			moveCountベースのfutility追加, 1スレッド、0.1秒設定
+			#0
+			やねうら王mini V202
+			singluar extension追加, 1スレッド、0.1秒設定
+
+			143-9-25(0.0% R303.0)	
+
+	→　これ結構効果あるみたい。
+	これ入れて、miniのほう、効果の薄いのざっくり消すか。
+
+・やねうら王mini、ソースコード整理して、exeフォルダの中身差し替えた。
+
+
+■ 2016/02/29 V2.02
+
+・classicにSingular Extension追加。
+
+	50.8%	
+	#62
+	やねうら王mini V202
+	singluar extension追加, 1スレッド、0.1秒設定
+	#0
+	やねうら王mini V201
+	extend check追加, 1スレッド、0.1秒設定
+
+	215-17-208(34.9% R5.8)	
+
+	おかしい。excludedMove = MOVE_NONEにしていないからか。初期化追加。
+
+・Singular、バグってないはずなのに強くならない。もう少し条件考えたほうがよさげ…。
+
+	51.8%	
+	#62
+	やねうら王mini V202
+	singluar extension追加, 1スレッド、0.1秒設定
+	#0
+	やねうら王mini V201
+	extend check追加, 1スレッド、0.1秒設定
+
+	379-48-352(15.0% R12.8)	
+
+
+■ 2016/02/28 V2.01
+
+・classicに王手による1手延長を追加。
+
+		57.5%	
+		#61
+		やねうら王mini V201
+		extend check追加, 1スレッド、0.1秒設定
+		#0
+		やねうら王mini V200
+		IID追加, 1スレッド、0.1秒設定
+
+		168-9-124(0.4% R52.8)	
+
+	見かけ上のRはずいぶん上がるが…。
+
+
+■ 2016/02/28 V2.00
+
+・classicに多重反復深化を入れてみる。
+	メモリが潤沢にある(or 指し手が1手0.1秒なら)、これによる勝率の変化はほとんどないはず。
+
+		51.7%	
+		#60
+		やねうら王mini V200
+		ProbCut追加, 1スレッド、0.1秒設定
+		#59
+		やねうら王mini V199
+		ProbCut追加, 1スレッド、0.1秒設定
+
+		1153-59-1076(5.1% R12.0)	
+
+	→　思ったより変わった。
+
+
+■ 2016/02/28 V1.99
+
+・classic開発開始。
+	・ProbCut入れてみる。
+	・StateInfoの変数名siではなくstにしてStockfishに合わせておく。
+	・MovePicker::nextMoveではなくnext_move()のほうがいいのでは…。
+・MovePickerにProbCut用の指し手生成を追加。
+
+		60.0%	
+		#58
+		やねうら王mini V199
+		ProbCut追加, 1スレッド、0.1秒設定
+		#0
+		やねうら王mini V192
+		null move追加, 1スレッド、0.1秒設定
+
+		150-7-100(0.1% R70.4)	
+
+・miniにもProbCutは入れる。ProbCut 10行程度のわりにR70ぐらい増えるのでお得だ。
+
+
+■ 2016/02/28 V1.98
+
+・miniのlazy SMP条件を調整。
+
+    for (Thread* th : Threads)
+      if (th->completedDepth > bestThread->completedDepth
+        && th->rootMoves[0].score > bestThread->rootMoves[0].score)
+        bestThread = th;
+		↓
+    for (Thread* th : Threads)
+      if (th->completedDepth  > bestThread->completedDepth ||
+         (th->completedDepth == bestThread->completedDepth &&  th->rootMoves[0].score > bestThread->rootMoves[0].score))
+        bestThread = th;
+
+	どう考えてもこっちのほうがいいと思うのだが…。
+	これでV1.95と4スレッド1秒で対戦させてみる。
+
+
+		48.2%	
+		#58
+		やねうら王mini V198
+		lazySMP改良, 4スレッド、0.1秒設定
+		#57
+		やねうら王mini V195
+		4スレッド設定, 4スレッド、0.1秒設定
+
+		477-42-513(88.0% R-12.6)	
+
+		この改良は駄目なのか。スコアがいいほうが楽観合議のような効果があるのだろうか。
+		→　元に戻す。
+
+	exeフォルダのminiを差し替える。
+	classicのほうの開発進める。
+
+
+■ 2016/02/28 V1.97
+
+・lazy SMP、言うほど強くなってないな…。再検証する。
+・completedDepthの初期化忘れていたの修正。
+・resignするときにlazy SMP、bestThreadを探す処理、これrootMoves.size()==0だとアクセス違反なのでは。
+　Stockfishのコードがおかしいんだな…。
+	→　修正した。
+・4スレッド設定と対局させておく。
+
+		75.7%	
+		#57
+		やねうら王mini V195
+		4スレッド設定, 4スレッド、0.1秒設定
+		#56
+		やねうら王mini V195
+		razoring戻す, 1スレッド、0.1秒設定
+
+		667-15-214(0.0% R197.5)	
+
+
+■ 2016/02/28 V1.96
+
+・Rootで3秒以上経過しているなら探索手を出力するように。
+
+・思ったより強くならない。旧形式からの評価関数バイナリの変換に失敗している可能性がなくもないな…。
+
+	検算しよう。
+	sfen lnsg1k3/9/pppp+N1G2/4pppp1/3l5/2P6/PPS1PPP2/1Kl1G1S2/LN3S+r2 w BRG4pnb 86
+	eval = -2047
+	→　完全に一致してた。
+
+・持ち時間制御をしていないことによる損失は2倍時間ぐらいで、R200ぐらいあるのかも。
+
+・singular extensionをしていない損とかもあるのか…。
+・ProbCutはMovePickerに手を入れないと実装できないしな…。
+
+・やねうら王miniはこんなもんでいいか…。じゃあ、miniはこれで完成。
+・exeフォルダにやねうら王miniを追加。
+
+
+■ 2016/02/28 V1.95
+
+・local serverでCreateProcessに失敗したときに復帰できなくなるの修正。
+
+	・V1.95a
+	razoring戻して、V1.94と対戦させておく。
+
+		54.2%	
+		#56
+		やねうら王mini V195
+		razoring戻す, 1スレッド、0.1秒設定
+		#55
+		やねうら王mini V194
+		定跡修正, 1スレッド、0.1秒設定
+
+		266-18-225(2.9% R29.1)	
+
+	→　これでいいや。
+
+
+■ 2016/02/28 V1.94
+
+・miniで定跡の指し手が指せていない。修正。
+・miniでrootMovesに定跡の指し手が含まれていない場合、定跡の指し手を選択しないように。
+・変な定跡を選択していたので勝率がちゃんと計測できてなかった。あらら…。まあいいや。パラメーターはまた調整しよう。
+・floodgateに6コアPCで放流しておく。
+
+		55.9%	
+		#55
+		やねうら王mini V194
+		定跡修正, 1スレッド、0.1秒設定
+		#0
+		やねうら王mini V192
+		null move追加, 1スレッド、0.1秒設定
+
+		100-4-79(5.0% R40.9)	
+
+
+■ 2016/02/28 V1.93
+
+・miniにrazoring追加。
+
+	  const int razor_margin_table[4] = { 483, 570, 603, 554 };
+	  const Value razor_margin(Depth d)
+	  {
+		ASSERT_LV3(DEPTH_ZERO <= d && d < 4 * ONE_PLY);
+		return (Value)(512 + 16 * static_cast<int>(d));
+		return (Value)razor_margin_table[d / ONE_PLY];
+	  }
+
+	53.4%	
+	#52
+	やねうら王mini V193
+	razoring追加, 1スレッド、0.1秒設定
+	#0
+	やねうら王mini V192
+	null move追加, 1スレッド、0.1秒設定
+
+	205-10-179(8.4% R23.6)	
+	→　あまり強くなってない。
+
+	V1.93a
+	Apery風のrazoringにしてみる。
+
+		inline Value razor_margin(const Depth d) {
+			return (Value)(512 + 16 * static_cast<int>(d));
+		}
+
+		if (!PvNode
+			&& depth < 4 * ONE_PLY
+			&& eval + razor_margin(depth) < beta
+			&& ttMove == MOVE_NONE
+			&& abs(beta) < VALUE_MATE_IN_MAX_PLY)
+		{
+			const Value rbeta = beta - razor_margin(depth);
+			const Value s = qsearch<NonPV, false>(pos, ss, rbeta - 1, rbeta, DEPTH_ZERO);
+			if (s < rbeta)
+			return s;
+		}
+
+		47.9%	
+		#53
+		やねうら王mini V193a
+		razoring apery風追加, 1スレッド、0.1秒設定
+		#52
+		やねうら王mini V193
+		razoring追加, 1スレッド、0.1秒設定
+
+		236-13-257(83.9% R-14.8)	
+
+	V1.93b
+		margin、線形にしてみる。
+
+		  const Value razor_margin(Depth d)
+		  {
+			static_assert(ONE_PLY == 2,"static_assert ONE_PLY == 2");
+			ASSERT_LV3(DEPTH_ZERO <= d && d < 4 * ONE_PLY);
+			return (Value)(512 + 16 * static_cast<int>(d));
+		  }
+
+		50.2%	
+		#54
+		やねうら王mini V193b
+		razoring apery+stockfish風追加, 1スレッド、0.1秒設定
+		#52
+		やねうら王mini V193
+		razoring追加, 1スレッド、0.1秒設定
+
+		112-9-111(44.7% R1.6)	
+
+		→　ほぼ変わらないから、これでいく。
+
+
+■ 2016/02/28 V1.92
+
+・miniにnull move pruning追加。
+・Position::do_null_move()/undo_null_move()追加。
+	→　iterationだいぶ回るようになった。
+
+		61.9%	
+		#51
+		やねうら王mini V192
+		null move追加, 1スレッド、0.1秒設定
+		#50
+		やねうら王mini V191
+		pseudo_legal修正, 1スレッド、0.1秒設定
+
+		166-3-102(0.0% R84.6)	
+
+
+■ 2016/02/27 V1.91
+
+・0.1秒自己対局で4000局で1回落ちたようだ。やはりinsert_pv_in_tt()以外で何かやらかしている。
+・リリースビルドであれ、デバッガでアタッチさえできればウォッチでpos.sfen()としてsfen文字列を取り出したり、
+	to_usi_string(move)とかで、指し手文字列を得たりできるので、デバッグは出来るのだが…。	
+
+	sfen lnsg1k3/9/pppp+N1G2/4pppp1/3l5/2P6/PPS1PPP2/1Kl1G1S2/LN3S+r2 w BRG4pnb 86
+
+・2PCで8時間回して落ちない。
+・残りのPCにもVS入れてテストする。
+・local server、pseudo-legalのチェック入れるべきか…。
+	→　すでに入ってた
+・MovePickerがpseudo legalの判定するのだが、check_info_update()が呼び出されていないのでは…。
+	→　と思ったが、呼びだされていた。
+・本格的に原因がわからんので、5PCでlocal-server回しておく。
+　↓
+  6時間で1回落ちた。
+	sfen 2bK1G3/7+L1/6+R2/1G6s/1G7/9/1P7/5ps2/2r1pks1+B w 10P3NG5p3lns 247
+	→　この局面100%落ちるわ..やったー！
+	59の歩が一歩進んで61の玉をcaptureしてる…。
+	ああ、置換表に58->59銀みたいな指し手があると、次にkillerでこれが歩に適用されて
+	59歩不成みたいな指し手が生成されるということなのか。なるほど、駒種を持っていないとこういうことが起こりえるのか…。
+	動かす駒を持っていればpseudo-legalの判定でその駒でなければ弾かれるのか。うーん、なるほど…。
+	→　調べてみたら、counte moveに登録されてこの手が生じたようだ。counter moveって駒が違うと適用されるべきではないのか..そうか..
+	pseudo_legal拡張して、かつ、駒種は持つべきなのか…そうか…。
+	置換表サイズ足りない..。
+
+    // これ、駒種を持っておいて、駒種が違うときは適用しないほうがオーダリング効率は上がる。
+    auto cm = thisThread->counterMoves.get(prevPc, prevSq);
+	Moveが32bitになるとCounterMoveの配列も倍になるしな…。
+	そもそもそんなに都合よく別の駒が来ていることって現実的にはほとんどない気もするしな…。
+
+・insert_pv_in_tt()のところ戻して、もう一度、変な指し手が生成されていないか確認する。
+
+・Position::legal<bool All>(),pseudo_legal<bool All>()
+　みたいなチェック入れたほうがいいのか…。うーん..
+  // All == true  : 歩や大駒の不成に対してはfalseを返すpseudo_legal()
+  template <bool All> bool pseudo_legal_s(const Move m) const;
+	追加した。
+
+・どこで不成の指し手が出てくるのか以下のコードを追加して調べる。
+
+          if (pos.pseudo_legal_s<false>(move) == false)
+          {
+            std::cout << pos << move << std::endl;
+            pos.pseudo_legal_s<false>(move);
+          }
+
+	"ln4s2/1k5b1/p1pgppp1n/1P2l2g1/1G5p1/4P4/P2P1PP1P/2S2S1R1/+n2K1G3 b S5p2lnbr 75"
+	この局面に対してQCHECKで歩の不成が生成されている。
+
+  case PAWN:   GEN_MOVE_NONPRO_CHECK(PAWN, pawnEffect, goldEffect); break;
+  case LANCE:  GEN_MOVE_LANCE_CHECK (LANCE, lanceEffect, goldEffect); break;
+
+  このへんが怪しい。
+
+      if (((Pt == PAWN || Pt == LANCE) &&
+        ((!All && ((Us == BLACK && rank_of(to) >= RANK_3) || (Us == WHITE && rank_of(to) <= RANK_7))) ||
+          (All && rank_of(to) != (Us == BLACK ? RANK_1 : RANK_9))))
+		この条件が間違っている。
+		↓こうではないかと。
+      if (((Pt == PAWN) &&
+          ((!All && !canPromote(Us,to)) ||
+            (All && rank_of(to) != (Us == BLACK ? RANK_1 : RANK_9))))
+        || ((Pt == LANCE) &&
+          ((!All && ((Us == BLACK && rank_of(to) >= RANK_3) || (Us == WHITE && rank_of(to) <= RANK_7))) ||
+            (All && rank_of(to) != (Us == BLACK ? RANK_1 : RANK_9))))
+
+			↓
+  rootPos.set("ln4s2/1k5b1/p1pgppp1n/1P2l2g1/1G5p1/4P4/P2P1PP1P/2S2S1R1/+n2K1G3 b S5p2lnbr 75");
+  cout << rootPos;
+  for (auto m : MoveList<QUIET_CHECKS>(rootPos))
+    cout << " " << m;
+		うまく動いた
+
+  Piece moved_piece(Move m) const { return is_drop(m) ? move_dropped_piece(m) : piece_on(move_from(m)); }
+	これが後手のときに後手の指し手でないのがおかしいのか。
+	→　これ修正した。駒打ちに関するオーダリングが少し改善されるかも。
+
+・statのupdateにassert追加した。
+
+・Threadsが変更になってからisreadyが送られてこないとisreadyでthread数だけ初期化しているものはこれではまずいのか…。
+
+sfen ln5nl/6gk1/p1sp1g1s1/1P2ppppp/1p1P5/1bP1PPPPP/PRNSBGNS1/6GK1/L2r4L b p 67
+setoption name Threads value 1
+isready
+go infinite
+
+test autoplay
+
+→　わかった。飛車を成って、その成った駒を動かした指し手がcounter moveに登録されている。
+　これがまずいので、MovePickerではpseudo_legal_s<false>()を呼び出すようにする。
+
+・これで修正できたと思うのでV1.88と対戦回してみる。
+
+		53.7%	
+		#50
+		やねうら王mini V191
+		pseudo_legal修正, 1スレッド、0.1秒設定
+		#0
+		やねうら王mini V188
+		並列化版 1スレッド設定, 1スレッド、0.1秒設定
+
+		237-21-204(5.3% R26.0)	
+
+	オーダリング改善されたせいかR25ほど上がっているのかも知れない。
+
+・nano plusのほう、リビルドして差し替えておく。
+
+■ 2016/02/27 V1.90
+
+・value_to_tt()の説明間違っていたので修正。
+・go infiniteで8時間回しても落ちないのに連続自己対局で落ちるということは
+　再戦時の初期化がおかしいのか…。
+
+  CounterMoveHistory.clear();
+  for (Thread* th : Threads)
+  {
+    th->history.clear();
+    th->counterMoves.clear();
+  }
+  こんだけは初期化されているのに…。
+
+・local serverで落ちたプロセスをtrapするようにする。
+	→　C#側から2段にCreateProcessしているのがいけないのか…。
+	→　C#のCreateProcessが子プロセスのエラーを握り潰しているのかも知れない..
+
+・local server単体ならデバッグ可能みたいなのでこれでやる。
+	落ちた
+	→　insert_pv_in_tt()
+	      ASSERT_LV3(MoveList<LEGAL>(pos).contains(m));
+	で落ちた。PVがおかしくなっているのか…。
+	pv配列の更新はおかしくないから、おかしいPV渡されていることになる。
+	pseudo-legalの判定怪しいな…。
+
+	このLEGALは、LEGAL_ALLのほうがいいのか…。
+	LEGALでない指し手が含まれているとここで引っかかって落ちるのか。
+	修正しておく。
+
+	→　しかし、ここで角の不成みたいな手が含まれているのがおかしい気がする。
+	CAPTUREの指し手に不成が含まれているのがおかしいのでは…。
+	→　含まれてないな…。おかしいな…。
+
+	→　銀の不成の指し手をcounter moveとして登録して、この位置に角が来ると
+	角の不成の指し手を生成することになる。
+
+	王のcaptureになっているのはどこか他のバグがあるはず…。
+	このままランニングさせておく。
+
+・pseudo_legalにASSERT少し追加。
+・MovePicker
+          ASSERT_LV3(pos.pseudo_legal_s<false>(move));
+こうしてランニングしてみる。
+
+・miniのsilent modeで定跡のcoutへの出力抑制する。
+
+
+■ 2016/02/26 V1.89
+
+・miniでmain threadでfail high/lowが起きたときにGUIに読み筋を出力するようにした。
+・miniでbook moveまわりの処理、整理。
+
+・静止探索で指し手がないときにそれを保存しないようにして比較実験。
+      // これ保存したほうがいいかどうかは比較実験が必要。
+      /*
+      tte->save(posKey, value_to_tt(bestValue,ss->ply) , BOUND_EXACT,
+        DEPTH_MAX, MOVE_NONE, ss->staticEval, TT.generation());
+      */
+
+		42.7%	
+		#47
+		やねうら王mini V189
+		並列化版 1スレッド設定, 1スレッド、0.1秒設定
+		#0
+		やねうら王mini V188
+		並列化版 1スレッド設定, 1スレッド、0.1秒設定
+
+		205-18-275(99.9% R-51.0)	
+
+		V1.89a
+		よくわからんけど、勝率悪いので戻す。
+		保存することで0.5手延長のような効果があるのだろうか..
+
+			50.5%	
+			#48
+			やねうら王mini V189a
+			並列化版 1スレッド設定, 1スレッド、0.1秒設定
+			#0
+			やねうら王mini V188
+			並列化版 1スレッド設定, 1スレッド、0.1秒設定
+
+			563-46-552(37.1% R3.4)	
+
+		計測しなおした。
+
+			50.2%	
+			#47
+			やねうら王mini V189
+			並列化版 1スレッド設定, 1スレッド、0.1秒設定
+			#0
+			やねうら王mini V188
+			並列化版 1スレッド設定, 1スレッド、0.1秒設定
+
+			4551-411-4514(34.9% R1.4)	
+
+		1.89、悪くなかった。
+
+
+■ 2016/02/26 V1.88
+
+・miniのaspirationでfail highのときの処理入れてなかった。修正した。
+・よし、さっきの局面では落ちなくなったのでまたもや1スレッドで対局させておく。
+・マルチスレッドのバグ、これで取れたのかも知れないので将棋所で自己対局もさせておく。
+　→　50局ほどやったが落ちない。
+・fail highの処理入れてないからaspirationのdeltaに対する効果が薄かったのかな。
+　あとで調整する。
+・4スレッド版とV1.82と対局させておく。
+
+		79.0%	
+		#46
+		やねうら王mini V188
+		並列化版 4スレッド設定, 1スレッド、0.1秒設定
+		#0
+		やねうら王mini V182
+		ss->moveCount更新するようにした, 1スレッド、0.1秒設定
+
+		413-25-110(0.0% R229.8)	
+
+		並列化によって4並列時でR230ほど上がっているようだ。
+		0.5手延長のような効果が出ているだけかも知れないのでこの数字は
+		あまりアテにならない。PV splitも実装して比較すべき。
+
+		あと上記の対局中に2回落ちているようだ。
+
+		sfen l2gk4/2s5g/1pn3rp1/2pp1p2N/8p/pP1P5/P1P1SP3/4KS3/LNBG2+p+rL b B5plnsg 75
+		sfen 5+S+RG+P/4+NK2+P/4P+P1+B1/S2b4+P/1+R1s5/9/P3+nk+n2/1+l3+p1+n+p/9 w 9PLGp2ls2g 232
+
+		単体では落ちないか…そうか…。
+		
+
+■ 2016/02/26 V1.87
+
+・miniでseldepthを出力するためにmaxPlyを更新するようにした。
+・miniのsearch(),qsearch()に次のassert追加
+    ASSERT_LV3(-VALUE_INFINITE<=alpha && alpha < beta && beta <= VALUE_INFINITE);
+    ASSERT_LV3((PvNode || alpha == beta - 1);
+・miniでbookMoveがあるときにRootMoves[0]を参照していたの修正。
+・将棋所でminiのDebug buildとランダムプレイヤーとを連続対局させておく。
+	→　突然落ちる。デバッグ不可。
+・Releaseビルドでtest autoplayだと落ちない。わけわからん。
+・1スレッド対局で落ちないかテストしよう。
+	V1.82と対局させておく。
+	→　V1.87のほう、一回落ちた…。なんで..
+	sfen ln1gk4/1r1s2pp1/pppppp1s+R/2b4g1/7NB/2P2g3/PPSP5/4S4/LN1GK4 b 3PLN3pl 77
+	
+		51.5%	
+		#44
+		やねうら王mini V187
+		並列化版 1スレッド設定, 1スレッド、0.1秒設定
+		#0
+		やねうら王mini V182
+		ss->moveCount更新するようにした, 1スレッド、0.1秒設定
+
+		1205-114-1133(6.8% R10.7)	
+
+
+■ 2016/02/26 V1.86
+
+・complete depthに反映させてなかったの修正。
+・miniのPV表示、もっと限定する。
+・ThreadPool::init_for_slave()追加
+	  void init_for_slave(const Position& pos, const Search::LimitsType& limits);
+・test autoplayコマンドを並列化されている探索部も呼び出せるようにした。
+・nano plusのSearch::clear()に
+  for (Thread* th : Threads)
+  {
+    th->history.clear();
+    th->counterMoves.clear();
+  }
+これ入れるの忘れてた。落ちる原因は、これか…。
+・nano plusの実行ファイル差し替え。
+・miniはまだ落ちる。なんぞこれ。
+	auto playでSearch::clear()呼び出さないからか。修正した。
+	しかし対局中に落ちたのはこれとは違うはずで…。
+	わからん。デバッグビルドでauto play回しておく。
+	→　一晩回して落ちなかった。
+
+
+・aspirationのdeltaの初期値の調整
+
+	50.9%	50.8%	47.1%	50.3%	46.6%	50.3%	49.4%	51.9%	52.0%	47.5%	51.7%	50.0%	50.6%	50.9%	50.4%	
+	#42
+	やねうら王mini V184a
+	aspirationの幅可変 param1 * 5, 1スレッド、0.1秒設定
+	#0
+	やねうら王mini V182
+	ss->moveCount更新するようにした, 1スレッド、0.1秒設定
+
+	678-75-655(26.4% R6.0)	678-73-657(28.3% R5.5)	617-65-692(98.1% R-19.9)	588-55-582(43.0% R1.8)	543-66-623(99.0% R-23.9)	591-50-583(40.8% R2.4)	568-75-581(64.9% R-3.9)	605-62-560(9.4% R13.4)	603-73-556(8.4% R14.1)	553-59-610(95.3% R-17.0)	601-63-562(12.6% R11.7)	587-58-587(50.0% R0.0)	587-64-573(34.1% R4.2)	589-70-569(27.8% R6.0)	589-64-579(38.5% R3.0)	
+
+	X=8、すなわち5*8 = 40がベストっぽい。このへんはもう少し作りこんでから再度調整すべき。
+
+
+■ 2016/02/26 V1.85
+
+・miniの並列化
+	→　half density matrix、実装できたかも。
+	aspirationの幅を30にしてテスト。
+
+	→　よくわからんのでこれでfloodgateに放流しておく。
+
+・MovePickerのあとのfutilityで刈らない分とlazy SMPでスレッドの空きが発生しない分かで、
+   4コアで4.7Mnpsぐらい出ている。HT有効にしたほうが良かったりして…。
+
+
+■ 2016/02/26 V1.84
+
+・並列化のための準備
+・aspiration searchの実装
+・RootMoves::insert_pv_in_tt()追加
+・MoveList::contains()追加
+・tt.hにupdate_pv()を追加する。
+	Search::Stack::pvを更新するようにした。
+・miniは、USE_TT_PVを使わないようにした。
+・にわかに信じられないが初手58玉の局面でevaluate()を呼ぶと-1500ぐらいの評価値が返ってくる。
+
+	V1.82と対戦させてaspirationによって勝率が落ちていないことを確認する。
+
+			50.8%	
+			#41
+			やねうら王mini V184
+			aspiration search実装, 1スレッド、0.1秒設定
+			#0
+			やねうら王mini V182
+			ss->moveCount更新するようにした, 1スレッド、0.1秒設定
+
+			166-25-161(37.0% R5.3)	
+
+	よくわからない。調整したほうがよさげ。
+
+	PV更新で少し時間かかるようになったのと、aspirationの窓の調整がうまく出来ていなくて
+	あまり効率が上がっていないっぽい。このへんのパラメーターはもう少し作りこんでから調整すべき。
+
+	V1.84a
+
+        // aspiration windowの幅
+        // 精度の良い評価関数ならばこの幅を小さくすると探索効率が上がるのだが、
+        // 精度の悪い評価関数だとこの幅を小さくしすぎると再探索が増えて探索効率が低下する。
+        delta = Value(param1 * 5);
+
+		aspirationの幅をstep 5ずつ変更してparam1 = 0..15ぐらいで最適値を探してみる。
+		→　一晩寝かせておく。
+
+
+■ 2016/02/25 V1.83
+
+・mini、思考開始時にTimerリセットしないと。
+・StockfishのSearch::LimitsがstartTime持っているの仕様としておかしい気がする。
+ 　→ やねうら王ではTimerクラスに持たせる。
+ ・Timer.init()でstartTimeを初期化するようにして、明示的にはこれをアクセスしないように変更する。
+
+・searchなどの返し値に次のassert入れた。
+	  ASSERT_LV3(-VALUE_INFINITE < v && v < VALUE_INFINITE);
+
+・aspiration windows search、原型だけ書く。
+
+	59.2%	
+	#40
+	やねうら王mini V182
+	ss->moveCount更新するようにした, 1スレッド、0.1秒設定
+	#0
+	やねうら王nano plus V180
+	EVASIONSのオーダリング追加, 1スレッド、0.1秒設定
+
+	302-23-208(0.0% R64.8)	
+
+	なぜかR60ぐらい上がっている。moveCount絡みのbonusなのか？
+
+
+■ 2016/02/25 V1.82
+
+・やねうら王mini開発開始
+・やねうら王nano plusの思考エンジンの実行ファイルをGitHubにcommit。
+・local-server、CreateProcessするときにデバッグ有効にしとくべきか…。
+	DEBUG_PROCESS
+	→　これではないのか。うーむ..
+
+	デバッガを自動的に起動する
+	https://msdn.microsoft.com/ja-jp/library/a329t4ed(VS.80).aspx
+
+	レジストリエディタを開き
+HKEY_LOCAL_MACHINE\Software\Microsoft\Windows NT\currentversion\image file execution options
+に、
+	新しいキーでデバッグ対象の実行ファイルの名前を入れる。"YaneuraOu-mini.exe"とか。
+		> 新しい文字列値を右クリックし、ショートカット メニューの [名前の変更] をクリックします。
+		> 名前を debugger に変更します。
+		> 新しい文字列値を右クリックし、ショートカット メニューの [変更] をクリックします。
+		> [文字列の編集] ダイアログ ボックスが表示されます。
+		> [値のデータ] ボックスに、「vsjitdebugger.exe」と入力します。
+
+	→　ビンゴ！これでやっとデバッグできる。4コアで24時間ほど回しておく。
+
+・miniに引き分け時スコア)Contenpt)を設定できるようにした。
+・miniの日本語化ファイル
+	YaneuraOu-mini_ja.txt
+	をexe/に追加。
+
+・miniをMultiPVに対応
+	isready
+	setoption name MultiPV value 5
+	go
+	→ PVの表示できた。指し手がないように見えるからmateになってしまうので修正。
+	→　表示がおかしいだけだった。修正した。
+
+・miscにTimeManagementクラス追加。
+・nano plusのss->moveCountの初期化してないな…。まあ、nano plusではあんまり影響ないからいいか。
+	nano plusで親nodeのss->moveCountを参照しているところコメントアウトしておく。
+	→　この効果があるのか調べるために前バージョンと対戦させておく。
+
+
+
+■ 2016/02/25 V1.81 nano plus (final)
+
+・BAD CAPTUREにSEE<0の指し手回すと強くなるのか？
+	ほぼ変わらないっぽい。
+	→　このまま一晩回してみる。
+	→　26コアで回して一晩で2回落ちた。誰か原因調べて欲しい…。
+
+
+		53.8%	
+		#38
+		やねうら王nano plus V181
+		BAD CAPTURE実装, 1スレッド、0.1秒設定
+		#0
+		やねうら王nano plus V180
+		EVASIONSのオーダリング追加, 1スレッド、0.1秒設定
+
+		6571-626-5634(0.0% R26.7)	
+
+		+R25程度。
+
+
+■ 2016/02/25 V1.80
+
+・EVASIONのオーダリングにSSEが必要だしな…。
+→　evasionのオーダリングと、QCAPTURES_1,2のオーダリングをするようにした。
+	静止探索のCAPTURESが改善されたので見かけの勝率が随分あがったが…。
+	たぶん言うほど効果ないと思う。
+
+		73.6%	
+		#37
+		やねうら王nano plus V180
+		EVASIONSのオーダリング追加, 1スレッド、0.1秒設定
+		#0
+		やねうら王nano plus V179
+		CAPTUREのオーダリング追加, 1スレッド、0.1秒設定
+
+		162-17-58(0.0% R178.4)	
+
+
+
+■ 2016/02/25 V1.79
+
+・MovePickerに他のオーダリングも導入
+	captureのときのオーダリング追加。
+	score_capture()追加。
+
+		54.4%	
+		#36
+		やねうら王nano plus V179
+		CAPTUREのオーダリング追加, 1スレッド、0.1秒設定
+		#0
+		やねうら王nano plus V178
+		counter move追加, 1スレッド、0.1秒設定
+
+		210-31-176(3.7% R30.7)	
+
+		+R30程度？
+
+
+■ 2016/02/25 V1.78
+
+・nano plusにCounterStats追加。
+・nano plusのMovePickerファイルを分離する。
+・Position::moved_piece()追加。
+・ThreadにCounterMoveHistoryStatsを持たさないといけないのに..これうまく分離できないな…。
+
+#ifdef USE_MOVE_PICKER
+  // スレッドごとにhistoryとcounter movesのtableを持たないといけない。
+
+  CounterMoveHistoryStats history;
+  MoveStats counterMoves;
+#endif
+	これ、仕方ないな…。
+
+・nano plusのkillerにcountermoveを入れるようにする。
+・historyのupdate()の処理入れる。
+
+		67.1%	
+		#35
+		やねうら王nano plus V178
+		counter move追加, 1スレッド、0.1秒設定
+		#0
+		やねうら王nano plus V176b
+		思考時間0.1～0.3秒, 1スレッド、0.1秒設定
+
+		420-19-206(0.0% R123.8)	
+
+
+・プロセスが落ちないか、26コアで一晩回しておく。
+・このバージョンをfloodgateに投入しておく。
+
+
+■ 2016/02/24 V1.77
+
+・劣等局面の判定追加する。
+→　確かに優等局面を発見したときに早く探索が回るが、思考時間が一定なので
+　この分の時間が得しなくて時間固定の自己対局では勝率が変わらない。
+	500局やってほぼ互角。
+
+
+■ 2016/02/24 V1.76
+
+・nano plusに簡単に導入できそうな枝刈りを追加する。
+	・futilityまず入れる。
+
+	  // game ply(≒進行度)とdepth(残り探索深さ)に応じたfutility margin。
+	  Value futility_margin(Depth d,int game_ply) {
+		// 80手目を終盤と定義して、終盤に近づくほどmarginの幅を上げるように調整する。
+		game_ply = min(80, game_ply);
+	    return Value(50 * d * (param1+1) + game_ply * param2);
+	  }
+
+	  こうやって、futilityの幅を調整してみる。
+	  param1 = 0..4 , param2を0..4ぐらいの幅で
+
+	  dにも比例させるべきなのか…そうか…。
+	    return Value(d * ((param1+1) * 30 + game_ply * param2 / 2));
+
+		param1 = 0..5 , param2 = 0..3ぐらいで回しておく。
+
+		→　X = 0..5
+		36.1%	62.7%	70.1%	68.2%	62.0%	60.5%	
+		52.8%	44.7%	63.3%	57.3%	55.3%	61.9%	
+		67.7%	78.3%	67.2%	62.8%	56.2%	59.4%	
+		46.7%	65.7%	64.7%	55.1%	63.3%	62.0%	
+		#32
+		やねうら王nano plus V176
+		futility margin調整中 , 1スレッド、0.1秒設定
+		#0
+		やねうら王nano plus V175
+		超安定版 , 1スレッド、0.1秒設定
+
+		297-10-525(100.0% R-99.0)	506-25-301(0.0% R90.2)	573-15-244(0.0% R148.3)	552-23-257(0.0% R132.8)	502-22-308(0.0% R84.9)	494-16-322(0.0% R74.3)	
+		428-21-383(5.3% R19.3)	360-27-445(99.9% R-36.8)	518-14-300(0.0% R94.9)	460-29-343(0.0% R51.0)	445-27-360(0.1% R36.8)	501-22-309(0.0% R84.0)	
+		545-27-260(0.0% R128.6)	642-12-178(0.0% R222.8)	548-17-267(0.0% R124.9)	427-10-253(0.0% R90.9)	343-14-267(0.1% R43.5)	365-10-249(0.0% R66.4)	
+		286-12-326(95.1% R-22.7)	401-14-209(0.0% R113.2)	392-18-214(0.0% R105.1)	338-11-275(0.5% R35.8)	391-6-227(0.0% R94.5)	377-16-231(0.0% R85.1)	
+
+		Y=0ではX=2あたりがピーク。depth*90ってことか。Aperyの130ぐらいになってるの意味があるんだな。
+		Y方向はなぜかY=2がピーク。Y=1の結果が直感に反するのでnanoとも対戦させてみる。
+		
+
+			80.9%	95.9%	93.9%	91.1%	91.3%	92.1%	
+			63.9%	73.1%	88.1%	86.1%	93.1%	87.8%	
+			91.3%	83.1%	92.3%	92.2%	90.0%	86.5%	
+			80.6%	94.1%	93.3%	86.5%	86.8%	81.4%	
+			#32
+			やねうら王nano plus V176
+			futility margin調整中 , 1スレッド、0.1秒設定
+			#30
+			やねうら王nano V172
+			テスト用のnano
+
+			463-20-109(0.0% R251.3)	560-8-24(0.0% R547.2)	551-5-36(0.0% R473.9)	534-6-52(0.0% R404.6)	538-3-51(0.0% R409.3)	538-8-46(0.0% R427.2)	
+			367-18-207(0.0% R99.5)	413-27-152(0.0% R173.6)	509-14-69(0.0% R347.1)	506-4-82(0.0% R316.1)	543-9-40(0.0% R453.1)	509-12-71(0.0% R342.2)	
+			527-15-50(0.0% R409.1)	468-29-95(0.0% R277.0)	537-10-45(0.0% R430.7)	540-6-46(0.0% R427.9)	505-18-56(0.0% R382.0)	468-19-73(0.0% R322.8)	
+			435-20-105(0.0% R246.9)	526-1-33(0.0% R481.0)	518-5-37(0.0% R458.5)	469-18-73(0.0% R323.1)	478-9-73(0.0% R326.4)	428-9-98(0.0% R256.1)	
+
+
+・まだ落ちる局面があるようだ。詰み絡みのようだが…。静止探索絡みか？
+
+	sfen ln4+P1p/9/ppp1kp2R/b2p5/K6+R1/2g6/P3+lg3/3s4+p/L+b7 b S2G9pl3n2s 173
+	よくわからないのでDebugビルドでtest autoplayで回しておく。
+	これでバグが発見するのに要する時間は、2時間×5PC*10倍nps = 100時間ぐらい回さないといけないのか。
+	いくらなんでもひどいな。Releaseモードで回すか。これなら10時間程度で見つかるはず..
+	→　これ自動テストのなかでもっと効率的に見つけられないのか？
+	if (param1!=5)
+	{
+	}
+	みたいにすれば特定のパラメータでその処理を省略することは出来るから
+	一晩寝かせておけばそこそこ原因がわかるはず…。
+	→　と思ったが3時間ほど回して落ちない…。
+
+・連続自己対局のときに思考時間ばらつかせないとな…。
+
+	・V1.76b
+
+	連続自己対局のために
+	go time 100
+	のようにしたら100ms秒だけ考えるという仕様にするか？
+	go randtime 100
+	としたときに100～300ms考えるという仕様にするとか？
+	go rtime 100
+	こうするか。実装した。
+
+	→        availableTime = Limits.rtime + prng.rand(Limits.rtime * 2);
+	→　終局の局面はそこそこバラけるようになったる
+
+
+■ 2016/02/24 V1.75
+
+・25000局ほど回して、V1.74、1度だけ落ちてる。
+	1<sfen 1n3k3/1PK2g3/2np5/2+B2+B3/L1pPp4/6p1+p/5G3/2G1GP2+p/1+rS3+r+l1 w 3P2LN3S6pn 142
+	→　例によって単体だと落ちない。26コアで8時間かけて1回落ちる程度のバグは探すの大変。
+	long effect絡みのような気もするが、これ修正するのは容易ではないな…。
+	QUIET_CHECKがpseudo-legalか確認しておく。
+	→　王手がかかっていない局面なので回避手になっているかは調べる必要がない。
+	ああ、わかった。
+	MovePickerの静止探索用のほうも、endMoves間違えてた
+	      endMoves += (_ttMove != MOVE_NONE);
+		  ↓
+	      endMoves += (ttMove != MOVE_NONE);
+	これでいいや。よしよし。
+
+
+■ 2016/02/23 V1.74
+
+・乱数seed、外部から読み込めるようにしたほうがよさげ。
+  thread idではなくprocess idにしたら解消するか？
+  →　まあいいや。
+・0.1秒で3万局やって47回落ちてた。26並列対局において1時間で6回ぐらい落ちるわけか。10分で1回落ちるな。
+	対局ログサイズ2.7MB
+	ASSERTに引っかかったケースなし。うわぁぁぁ。
+	思考エンジンからログを書きだそうにもバッティングするしな..
+	local server、思考エンジンからのエラーは先頭にErrorの文字を入れるように。
+・ランダマイズやはり何かおかしい気がする。子プロセスだとthread idが固定化されているとしか思えない。
+  process IDにするか..。定跡局面で定期的にランダム思考させるか。うむむ..
+  →　thread IDでバラけてた。うわぁぁぁ。
+ ・PRNG、初期化時に乱数まわすようにした。
+  int n = (int)get_thread_id() & 1024; // 最大1024回、乱数を回してみる
+    for (int i = 0; i < n; ++i) rand<uint64_t>();
+・local serverにメッセージをbypassする仕組みが要るのでは…。
+  Redirectorのread()で"Error"の文字列をbypassするようにした。
+  文字列はERRORではなくErrorで統一することにした。
+・定跡早い段階で抜けると同じ展開になるというのはあるのか…。
+	MultiPVで思考するとかしないと同じ展開を抜けられないな。まあ、仕方ないか。
+	local serverで開始タイミングばらけさせるの意味ないな。
+・nano plus、静止探索をreturn evaluate(pos);にしてどうなるかやろう。
+	→　これでも落ちるのか..
+
+	・置換表の指し手、無効化してみる。
+//    ttMove = ttHit ? tte->move() : MOVE_NONE;
+    ttMove = MOVE_NONE;
+	→　これでもないのか。なんなのだ…。
+
+	・killerも無効化してみる。	
+
+        case KILLERS:
+          move = *currentMoves++;
+
+		#if 0
+				  if (  move != MOVE_NONE         // ss->killer[0],[1]からコピーしただけなのでMOVE_NONEの可能性がある
+					&&  move != ttMove            // 置換表の指し手を重複除去しないといけない
+					&&  pos.pseudo_legal(move)
+					&& !pos.capture_or_pawn_promotion(move))  // 直前にCAPTURES_PRO_PLUSで生成している指し手を除外
+					return move;
+		#endif
+				  break;
+
+	→　これも違うのか..
+
+	mate1消す
+	LONG_EFFECT_LIBRARYも使わない。
+	→　これでもあかんのか。なんなん…。
+
+		//    (ss + 2)->killers[0] = (ss + 2)->killers[1] = MOVE_NONE;
+
+		#if 0
+			  auto draw_type = pos.is_repetition();
+			  if (draw_type != REPETITION_NONE)
+				return draw_value(draw_type,pos.side_to_move());
+		#endif
+
+	これでどうか。→　あかん。
+
+		MovePicker、これでどうか。
+		//    KILLERS,                      // KILLERの指し手
+	//    BAD_CAPTURES,                 // 捕獲する悪い指し手
+		GOOD_QUIETS,                  // CAPTURES_PRO_PLUSで生成しなかった指し手を生成して、一つずつ返す
+	//    BAD_QUIETS,                   // ↑で点数悪そうなものを後回しにしていたのでそれを一つずつ返す
+
+	これもあかんのか。probeの直後、
+
+	    ttHit = false; // 置換表にhitしていないことにする。
+
+	これでどうか。→　落ちない？
+
+		// -----------------------
+		//  局面を評価値によって静的に評価
+		// -----------------------
+
+		ttHit = false; // 置換表にhitしていないことにする。
+
+	ここならどうか。→　落ちる
+
+		Move ttMove = RootNode ? thisThread->rootMoves[thisThread->PVIdx].pv[0]
+		  : ttHit ? tte->move() : MOVE_NONE;
+
+		ttHit = false; // 置換表にhitしていないことにする。
+
+	ここは？ →　落ちる
+
+	      MovePicker mp(pos, MOVE_NONE /*ttMove*/ ,ss);
+
+	これは？ →　落ちないくさい。MovePickerの置換表絡み怪しげ。
+
+	      endMoves += (ttMove_!= MOVE_NONE);
+	これか。
+      endMoves += (ttMove != MOVE_NONE);
+	こうやん..。
+
+	→　2000局やって、落ちない。これだった…。やっと改良に戻れる。
+	→　V1.70と対局させてみる。
+	→　弱くはなってなさげ。
+
+		50.2%	
+		#28
+		やねうら王nano plus V172
+		落ちる原因調査 , 1スレッド、0.1秒設定
+		#25
+		やねうら王nano plus V170
+		千日手判定追加 , 1スレッド、0.1秒設定
+
+		12481-389-12401(30.6% R1.1)	
+
+
+■ 2016/02/22 V1.73
+
+・定跡のrandomizeのため、randのrandomizeの性能を上げる。
+	→ thread idもseedに用いるように変更。
+
+・local server、終局時のsfen出力して、同一局面でないことを確認したほうがいいのでは..
+
+・てか、どこをいじった結果かは知らんが落ちなくなってる…。
+	→　と思ったら落ちたようだ。
+
+	sfen ln1g4+L/1s4s1P/p1p1pk3/1P4pp1/P8/1B4n1R/2NS1+p3/3GS3K/L4g1N1 b 5PLBG4pr 103
+
+・DrawValue、関数を通すようにする。→　draw_value()
+
+	同じところで落ちてるな。単体だとここで落ちないんだよな…。
+	→　てかrandom playerでも落ちるんか？それを先に確認しないと原因の絞りようがない。
+	→　random player落ちないな…。test rpで落ちないのだから落ちないか…そうか…。
+	→　nanoも連続自己対局させてみる。
+	→　nanoは4000局で落ちないのか…。
+	つまりpseudo_legal()は正しい。
+
+	nano plusのMovePickerとかis_repetitionとかが怪しいのかな？
+
+	is_repetition、シンプルだし、たぶん合ってる。
+
+	QUIET_CHECKSが怪しい。
+
+      case QCHECKS:
+//        endMoves = generateMoves<QUIET_CHECKS>(pos, moves);
+        endMoves = moves; // 生成しないと？
+        break;
+
+		→　生成しなくとも落ちた。なんなんこれ…。
+	sfen +B+P1S+P1+L2/3+R5/1p1p+Pp+L+R1/1kp6/p6G1/9/P3+p1P2/5+b1K1/L1G6 b 7PL4N3SGg 131
+	sfen 1s3pR+R1/l3kg2P/p1+Np4+P/4pbl2/P2Pn4/L1P1K4/1P7/1sS2PB+p1/3G5 b PLS5p2n2g 151
+
+	nano plusのMovePicker、ちゃんと見なおしたほうがよさげ…。
+
+	sfen 3+P2kp+R/l3gl+r2/pppp1pp2/7sB/9/9/PPP2SPPN/1B3P1G1/L1SG2K2 b 3PL2NGpns 105
+
+・nano plus、"go infinite"に対応させる。
+
+	is_repetition を 無効化して落ちるかのテスト。
+	→　落ちたか。これはきつい。
+
+・ASSERTに関して、errorでも出力できればいいのだが…。
+
+	local-serverで"ERROR:"というメッセージをリダイレクトするようにして、
+	ASSERTでは"ERROR:xxx"と出力できるようにするか。
+	→　USE_DEBUG_ASSERT追加
+	#define ASSERT(X) { if (!(X)) std::cout << "\nERROR : ASSERT(" << #X << ")\n"; }
+	こうした。
+
+	・local-serverでgame over時にsfenの出力
+	・thread idだと同じ番号なのか…？
+	local-serverの開始タイミングをずらすか。
+	→　こうした。
+	  for (auto th : Threads.slaves)
+	  { th->start_searching(); sleep(10); } // 開始タイミングをずらすことで乱数seedをばらけさせる
+	→　これでもまだ乱数偏るな…なんなの…。
+	→　thread_idが同じ値なのか？うむむ？
+	乱数seed調整してみた。
+	  PRNG() : s(now() ^ uint64_t(this) + get_thread_id()*1234567) {}
+	  →　これでも駄目か..
+
+	// 乱数のseedなどとしてthread idを使いたいが、
+	// C++のthread idは文字列しか取り出せないので無理やりcastしてしまう。
+	inline uint64_t get_thread_id()
+	{
+	  auto id = std::this_thread::get_id();
+	  if (sizeof(id) >= 8)
+		return *(uint64_t*)(&id);
+	  else if (sizeof(id) >= 4)
+		return *(uint32_t*)(&id);
+	  else 
+		return 0; // give up
+	}
+	別マシンと同じthread idを引いてくることってありえるのか？わからん..
+	→　そうでもなさげなのでこれはいいや。
+
+・ASSERTでエラーが出力されるようにしたnano plus、1300局でやっと落ちたが、
+	ASSERTにはかからず。
+
+	sfen ln1g4+L/1s4s1P/p1p1pk3/1P4pp1/P8/1B4n1R/2NS1+p3/3GS3K/L4g1N1 b 5PLBG4pr 103
+
+
+
+■ 2016/02/22 V1.72
+
+・また落ちる局面があった。
+	sfen l+R2+L3+P/g4P2G/pppp3b1/4+r2bk/4p4/P1PSP4/1P1S1G3/2KG5/LNS5+p w 2N6plns 142
+	→　落ちない。わからん。
+	sfen 1G4+L1+S/+r8/1p+S4+P1/2N1+B4/9/4GP2+B/+ln2K2p+R/k5s1p/1g+p1G1+p+p+n w 6PLN4pls 186
+	sfen +R8/5G3/1p2+B+N1+B1/p1ps5/2k4K1/P1+rP1+sP2/4g4/9/+s1G4+p1 b 5P3L2NS6plng 133
+	
+・打ち歩詰めの指し手生成、~UsではなくUsか。修正した。
+      Bitboard pe = pawnEffect(Us,pos.king_square(~Us));
+	  →　違った。あってた。
+
+・歩を打つときの判定、legal_pawn_drop()にまとめた。
+
+・nano-plusのmate1ply()、残り深さがONE_PLYより大きいときにのみ呼ぶようにした。
+
+・local game serverでエンジン名ではなく実行ファイル名を表示するように。
+・local game serverでtime out時(おそらくエンジンが停止した)に、継続できるように修正。
+	→　これで永続的にランニングできる…はず。(暴走したエンジンがに残存しなければ)
+
+・floodgateに投入してあるほう、R2200付近の対戦相手が少なくて正確なレーティングがわからない。
+	たぶんR2200ぐらいなのではあるのだろうけども。もうちょっと強くしないとな。
+
+・この局面の指し手、おかしい
+	>1:position startpos moves 7i6h 3c3d 8h7i 8c8d 6i7h 8d8e 3i4h 8e8f 8g8f 8b8f P*8g 8f8d 5g5f P*8f 8g8f 8d8f P*8g 8f5f 5i6i 2b4d 6h5g 5f5e 5g4f 5e8e 4h5g 5c5d 5g6f 8e2e 3g3f 2a3c 2i3g 2e8e 7g7f 4a5b 8i7g 8e8b 2h5h P*8f 8g8f 8b8f P*8g 8f7f 5h5d 7f7d 5d5f 4d6b 6f6e 7d9d 5f8f P*8b P*5d 7c7d 8f5f 8a7c 4f5e 7d7e 2g2f 6b2f 4i3h 3a4b 3f3e 2f3e 7i3e 3d3e 5f2f B*1d 2f5f 3e3f B*2b 3f3g+ 3h3g 3c4e 3g4f N*3d 4f3f P*3e 5d5c+ 4b5c 2b3c+ 5c4b 3c4b 5a4b S*2e 3e3f 2e1d 1c1d P*5c 5b6b 6e5d 4e3g+ 6i7i B*8c 5d4c+ 4b4c
+
+・local serverで暴走した局面集
+	shogi-observer-log.txt(570): 4<sfen ln1g4+L/1s4s1P/p1p1pk3/1P4pp1/P8/1B4n1R/2NS1+p3/3GS3K/L4g1N1 b 5PLBG4pr 103
+	shogi-observer-log.txt(702): 1<sfen ln1g4+L/1s4s1P/p1p1pk3/1P4pp1/P8/1B4n1R/2NS1+p3/3GS3K/L4g1N1 b 5PLBG4pr 103
+	shogi-observer-log.txt(1425): 4<sfen +S2+N5/8+R/G8/9/3K+R4/9/4+s+p+p+pg/1+p3+b+p2/1k1+b+p+n+p+p+p b 8PLp3l2n2s2g 157
+	shogi-observer-log.txt(1745): 4<sfen ln1g4+L/1s4s1P/p1p1pk3/1P4pp1/P8/1B4n1R/2NS1+p3/3GS3K/L4g1N1 b 5PLBG4pr 103
+	shogi-observer-log.txt(2041): 2<sfen 1b4+LG1/9/2nP1+P2k/1P1+R1K1N1/6PP1/2p2g1+r1/4+p2g1/1S5+p1/+pN4+pb1 b 6PS2p3ln2sg 251
+	shogi-observer-log.txt(2249): 2<sfen l1n3+L1+S/1kr+B1p3/pp1+Sp1+b2/2p6/9/2PG2P2/P1K2P3/4G4/9 w 4PL3N2SR2G5pl 140
+	shogi-observer-log.txt(2606): 1<sfen ln1g4+L/1s4s1P/p1p1pk3/1P4pp1/P8/1B4n1R/2NS1+p3/3GS3K/L4g1N1 b 5PLBG4pr 103
+	shogi-observer-log.txt(2840): 3<sfen lns3+L2/4+R4/ppkpp4/2p3+B2/3N1pK2/8+R/PPPP5/1B4+l2/LNSG2+p2 w 4P2S3G3pn 82
+	shogi-observer-log.txt(2999): 4<sfen ln4+L1+N/k8/1g2G+B1+S1/p8/6K2/1+r2+p4/+p1+p6/7p+p/2+r5+p w 8P2L2S2G3p2nsb 180
+	shogi-observer-log.txt(3888): 4<sfen ln1g4+L/1s4s1P/p1p1pk3/1P4pp1/P8/1B4n1R/2NS1+p3/3GS3K/L4g1N1 b 5PLBG4pr 103
+	shogi-observer-log.txt(4669): 2<sfen 4g1k2/3Ps1p2/R8/2+B3LBL/ppP1SP3/1RN6/6N2/3SK4/3G1GS2 b 5PLN7plng 133
+	shogi-observer-log.txt(4874): 2<sfen 3+P2+L1+S/1+P4+N+B+P/7+S1/4+rlg1P/4P1p2/1P1GS1g1p/P2P+b+p1+p1/LKS3k2/5P+p1+n w 2P2NR2plg 238
+	shogi-observer-log.txt(5108): 3<sfen ln1g4+L/1s4s1P/p1p1pk3/1P4pp1/P8/1B4n1R/2NS1+p3/3GS3K/L4g1N1 b 5PLBG4pr 103
+	shogi-observer-log.txt(5327): 2<sfen lnsg1+L3/9/ppppk4/2N2gpb1/1K4P2/1P4R1s/P1P+r3+p1/2s1p4/L1+b1+n1S2 w P2G6pln 146
+	shogi-observer-log.txt(5723): 4<sfen ln1g4+L/1s4s1P/p1p1pk3/1P4pp1/P8/1B4n1R/2NS1+p3/3GS3K/L4g1N1 b 5PLBG4pr 103
+	shogi-observer-log.txt(6331): 4<sfen ln1g4+L/1s4s1P/p1p1pk3/1P4pp1/P8/1B4n1R/2NS1+p3/3GS3K/L4g1N1 b 5PLBG4pr 103
+	shogi-observer-log.txt(7151): 4<sfen ln1g4+L/1s4s1P/p1p1pk3/1P4pp1/P8/1B4n1R/2NS1+p3/3GS3K/L4g1N1 b 5PLBG4pr 103
+	shogi-observer-log.txt(7569): 4<sfen ln6+L/2ksg4/pppppp3/3rN4/4+b4/2PPS4/PP1K1PN2/6S2/LNSG1G2+p w BR6plg 70
+	shogi-observer-log.txt(8258): 1<sfen 5s1+P+B/1rk6/2nss3+N/1p2p3G/9/2+r6/1+b1P3p+p/2PK2+p1+p/+n+l1G2+p+p+p w 5P2Gp3lns 170
+	shogi-observer-log.txt(9067): 2<sfen ln1g4+L/1s4s1P/p1p1pk3/1P4pp1/P8/1B4n1R/2NS1+p3/3GS3K/L4g1N1 b 5PLBG4pr 103
+	shogi-observer-log.txt(13072): 4<sfen ln1g4+L/1s4s1P/p1p1pk3/1P4pp1/P8/1B4n1R/2NS1+p3/3GS3K/L4g1N1 b 5PLBG4pr 103
+	shogi-observer-log.txt(13169): 2<sfen ln1g4+L/1s4s1P/p1p1pk3/1P4pp1/P8/1B4n1R/2NS1+p3/3GS3K/L4g1N1 b 5PLBG4pr 103
+	shogi-observer-log.txt(13791): 4<sfen ln1g4+L/1s4s1P/p1p1pk3/1P4pp1/P8/1B4n1R/2NS1+p3/3GS3K/L4g1N1 b 5PLBG4pr 103
+	shogi-observer-log.txt(14215): 4<sfen lnS+S4+P/1n2+R3+P/k+B7/1pp3np1/p7K/6P2/P8/1L2+l1G2/LN6+R w 10P2SB3G 180
+	shogi-observer-log.txt(15356): 2<sfen ln4+L2/1r1+S+BG2P/pkp1+B3+N/1p1p5/9/2P6/PP1P2+p2/4K2+p+p/LNSG1S2+p b 4PLNRGpsg 87
+
+	→　同じ局面いっぱいある…。定跡、そんなにバラけてないのか…。それは残念…。連続自己対局、思考時間、ランダム化したほうがいいのでは…。
+
+	random playerをしばらく回す。
+	→　検出できない。nano plusが何かバグっているのか…。そうか…。
+	→　nano plusを1プロセス内で連続自己対戦させるか。
+	→　testコマンドにautoplay追加。
+	・LimitTypeにサイレントモード追加。
+	・nano plusにサイレントモード追加。
+	
+	・is_draw()、最初に2手遡るの忘れていたので修正。
+	・is_repetitionに名前変更。
+
+		setoption name Hash value 4
+		isready
+		test autoplay
+
+	これでしばらく回しておく。
+	→　一時間回して落ちない。
+	ASSERT、引っかかるときにメッセージを出すようなASSERT作るべきかも..
+
+	仕方ないので、自己対局で落ちるかのテストをする。
+
+
+■ 2016/02/22 V1.71
+
+・色々いじったので、search()のなかでmate1有効にしてみる。
+
+    // RootNodeでは1手詰め判定、ややこしくなるのでやらない。
+    // 置換表にhitしたときも1手詰め判定は行われていると思われるのでこの場合もはしょる
+    if (!RootNode && !ttHit )
+    {
+      bestMove = pos.mate1ply();
+      if (bestMove != MOVE_NONE)
+      {
+        // 1手詰めスコアなので確実にvalue > alphaなはず。
+        alpha = mate_in(ss->ply);
+        tte->save(posKey, value_to_tt(alpha, ss->ply), BOUND_EXACT,
+          DEPTH_MAX , bestMove, ss->staticEval, TT.generation());
+
+        return alpha;
+      }
+    }
+
+	こうしておく。なんか前のバージョンに有意に勝ち越す気がしなくもない…。
+
+	・V1.71a
+		
+	    if (!RootNode && !ttHit && depth > param1*ONE_PLY)
+
+		こうして、param1 = 0 .. 8ぐらいで最適値を調べてみる。PVとnon PVで違ってくるのか..まあいいか…。
+
+
+
+		49.1%	50.4%	50.7%	50.8%	51.1%	
+		#27
+		やねうら王nano plus V171a
+		search()でmate1呼び出すように param1でそのdepth変更 , 1スレッド、0.1秒設定
+		#0
+		やねうら王nano plus V170
+		千日手判定追加 , 1スレッド、0.1秒設定
+
+		1613-37-1672(84.8% R-6.2)	1658-51-1630(31.3% R3.0)	1596-47-1550(20.6% R5.1)	1571-45-1521(18.4% R5.6)	1579-31-1511(11.1% R7.6)	
+
+		depth > ONE_PLY
+		これぐらいで呼び出さないとリターン小さすぎなのか。そうか。
+
+
+■ 2016/02/22 V1.70
+
+・Position::is_draw()追加した。
+・nano-plusに連続王手の千日手の検出コードを追加する。
+・nano-plusでMAX_PLY到達のときのスコアを引き分けのスコアに変更する。
+	→　変更した。無駄な探索が減った分と、連続王手でMAX_PLYまで延長していたのが
+	解消した分だけ強くなっているような…。(+R20)
+
+		53.0%	
+		#25
+		やねうら王nano plus V170
+		千日手判定追加 , 1スレッド、0.1秒設定
+		#0
+		やねうら王nano plus V169c
+		打ち歩詰め関係の修正 , 1スレッド、0.1秒設定
+
+		351-18-311(5.5% R21.0)	
+
+
+■ 2016/02/21 V1.69
+
+・指し手生成に打ち歩詰め入れて、pseudo_legal()で打ち歩詰め判定入れるの忘れていた。修正。
+
+	・V1.69a
+		legal_dropを呼ぶときにその前に敵玉がいるかの判定が要るんだった…。修正。
+		王手になる打ち歩の指し手生成、修正。
+
+	・V1.69b
+
+		  Square pawn_attack = (sideToMove == BLACK) ? to + SQ_U : to + SQ_D;
+		  if (sq_king != pawn_attack)
+			return true;
+
+		  // →　この判定の仕方だと、kingが駒落ちでSQ_NBにいるときにSQ_NB - 9の場所に歩を打つとkingの
+		  // 行き場所がないから打ち歩詰めと判定されてしまう。
+
+		  if (pawnEffect(sideToMove, to) != Bitboard(sq_king))
+			return true;
+
+	こう書くべきなのか…。同様のミス、他はやってなかった。
+
+	・V1.69c
+
+	pseudo_legal()を以下のように修正。
+
+    // 歩のとき
+    if (pr == PAWN)
+      if ((pieces(us, PAWN) & FILE_BB[file_of(to)])                                 // 二歩
+        || ((pawnEffect(us, to) == Bitboard(king_square(~us)) && !legal_drop(to)))) // 打ち歩詰め
+      return false;
+
+	legal_drop()に玉の位置に関するASSERT追加。
+
+	王手となる打ち歩の指し手生成、以下のように修正。
+
+      // 二歩と打ち歩詰めでないならこの指し手を生成。
+      if (!(FILE_BB[file_of(to)] & pos.pieces(Us,PAWN)) &&
+        !((pawnEffect(Us, to) == Bitboard(king_square(~Us)) && !pos.legal_drop(to))))
+        mlist++->move=make_move_drop(PAWN, to);
+
+		・勝率の偏りはないと思うが、1000局ほどランニングしておく。
+		→　弱くはなってなさそうなのでこれでOk.
+		4000局やってみたところ、+R10程度上がっていることがわかった。
+
+
+■ 2016/02/21 V1.68
+
+・nano plus、full depth searchも、nonPVでやるべきでは..
+　→　修正した。
+・LMRのreduction量、ONE_PLYを引いてからリダクションしないといけないの、間違えていたので修正。
+
+	・V1.68a
+
+・full depth searchで探索窓狭くしていなかったの修正。
+	130ぐらい低いな…。わけがわからん…。
+
+          Depth d = max(newDepth - r + (Depth)1, ONE_PLY);
+	こうしたら、めっちゃ勝率上がった。わけがわからん…。
+
+
+			77.9%	
+			#20
+			やねうら王nano plus V168
+			LMR、full depth search修正,1スレッド、0.1秒設定
+			#
+			やねうら王nano plus V166
+			通常探索でevaluate()を呼び出すように,1スレッド、0.1秒設定
+
+			187-1-53(0.0% R219.0)	
+
+	・V1.68b
+          Depth d = max(newDepth - r , ONE_PLY);
+		  こう戻してみる。
+
+		37.1%	
+		#21
+		やねうら王nano plus V168b
+		LMR変更テスト,1スレッド、0.1秒設定
+		#
+		やねうら王nano plus V166
+		通常探索でevaluate()を呼び出すように,1スレッド、0.1秒設定
+
+		109-3-185(100.0% R-91.9)	
+
+		  →　やはり-R90ぐらいになる。わけがわからん。
+
+	・V1.68c
+		捕獲はreduction減らす。
+		→　関係なさげ。
+		reduction、0.5手延長のようになって強いだけなのか？
+
+		一度、nanoと比較してみる。
+		
+		94.0%	
+		#22
+		やねうら王nano plus V168c
+		LMR変更テスト2,1スレッド、0.1秒設定
+		#1
+		やねうら王nano V140
+		やねうら王nanoの最終版1スレッド、0.1秒設定
+
+		156-1-10(0.0% R477.2)	
+
+
+		88.2%	
+		#21
+		やねうら王nano plus V168b
+		LMR変更テスト,1スレッド、0.1秒設定
+		#1
+		やねうら王nano V140
+		やねうら王nanoの最終版1スレッド、0.1秒設定
+
+		150-1-20(0.0% R350.0)	
+
+		→　どうも0.5手延長の効果のような気がしてきた。
+		ちょっと気分は悪いが、今回のものを採用する。
+
+・Position::capture(),capture_or_promotion()でdrop除外するの忘れていた。修正。
+	→　これのためにLMRの処理がおかしくなっていたのか？
+	→　これを修正したが、それでもV1.68bにはかなり負け越す。
+
+			30.1%	
+			#
+			やねうら王nano plus V168c
+			LMR変更テスト2,1スレッド、0.1秒設定
+			#21
+			やねうら王nano plus V168b
+			LMR変更テスト,1スレッド、0.1秒設定
+
+			31-1-72(100.0% R-146.4)	
+
+	・V1.68d
+
+		わかった。
+          value = depth < ONE_PLY ?
+		  は、まちがい。
+          value = newDepth < ONE_PLY ?
+		  これが正しい。
+
+		  1.66と対戦させる。結構勝ち越すようだ。
+		  これでcommitしておく。
+
+		  floodgateでR2500以上つくなら、これでnano plusは開発終了。
+
+
+■ 2016/02/21 V1.67
+
+・nano plus、improvingフラグ用意。
+	→　この改良は微差のようなのでこのままランニングさせておくる
+
+		50.5%	
+		#19
+		やねうら王nano plus V167
+		improving追加,1スレッド、0.1秒設定
+		#0
+		やねうら王nano plus V166
+		通常探索でevaluate()を呼び出すように,1スレッド、0.1秒設定
+
+		934-3-915(32.9% R3.6)	
+
+		ほぼ変わらない…。なんなの…。
+
+
+■ 2016/02/21 V1.66
+
+・nano plus、通常探索でeval保存するようにした。
+	+R50ぐらいup？
+	通常探索でevalが呼び出されると差分計算が出来るようになるのでその分だけ得なのか…。
+	やや高速化した気がする。
+
+・Eval::eval()という関数名、気に入らないのでevaluate()と名前を変更する。
+・連続対戦のときの戦績が偏るの、同じseedの乱数を使って定跡選択をしているからという話はないか…？
+	→　uint64_t(this)を乱数seedにしているので実行ファイルの読み込みのランダム化が行われているなら問題なさげ…。
+
+
+■ 2016/02/21 V1.65
+
+・まだ落ちる局面があるようだ。もしかして255手目でMAX_PLYに到達して落ちた感じ？
+
+	4<Error : engine timeout , engine name = YaneuraOu nano plus KPP 1.62 64 AVX2
+	4< □ 金 □ □ 玉 金 と □ と
+	4< □ □ 圭 □ □ 圭 □ 杏 □
+	4< □ □ と □ □ □ □ と と
+	4< □ □ □ □ □ 馬 □ □ □
+	4< □ □ □ □ □ □ □^歩^と
+	4< □ □ □ □ □ □ □^と □
+	4< □ □ □ □^全 □^と □ □
+	4< □ □ □ □^龍^と^玉^と^と
+	4< □^金^と □ □ □^と^と^と
+	4<先手 手駒 :  歩2 香 角 , 後手 手駒 :  香2 桂2 銀3 飛 金
+	4<手番 = 先手
+	4<sfen 1G2KG+P1+P/2+N2+N1+L1/2+P4+P+P/5+B3/7p+p/7+p1/4+s1+p2/4+r+pk+p+p/1g+p3+p+p+p b 2PLB2l2n3srg 255
+
+	→　nano plusのsearch stackがkillerの初期化でアクセス違反になるっぽい。
+		search<Root>は、やめたほうがいいのでは..うーん。id_loop()、あとで考え直す。
+		とりあえずss+1にしてるのはおかしいのでそこだけ修正する。
+
+		あとsearchにMAX_PLYの判定追加する。
+		連続王手の千日手、判定していないのでそれ絡みで無限に延長されてPVでMAX_PLYに到達して落ちるのか。そうか…。
+		とりあえずMAX_PLYの判定だけ追加した。
+
+	1<Error : engine timeout , engine name = YaneuraOu nano plus KPP 1.64 64 AVX2
+	1<^香 □^玉 □ □ □ □ □ と
+	1< □ □^龍^金 □ □ □ 馬 □
+	1< □ □^桂 □ □ と □ □ □
+	1< □ □ □^歩 □ □ □ □ □
+	1< □ □ □ □ 歩 □ □ □ □
+	1< □ □ 馬 □ □ □ □^歩 □
+	1<^と □ □ □ 玉 □ □ □^と
+	1< □ □ □ □ □ □ □^と^と
+	1< □ □ 龍 □ □ □ □^と □
+	1<先手 手駒 :  歩4 桂3 銀 金 , 後手 手駒 :  歩4 香3 銀3 金2
+	1<手番 = 先手
+	1<sfen l1k5+P/2+rg3+B1/2n2+P3/3p5/4P4/2+B4p1/+p3K3+p/7+p+p/2+R4+p1 b 4P3NSG4p3l3s2g 157
+
+	・前のバージョンに対してだいぶ負けるようになった。もしかして前のバージョン、連続王手の千日手で不利になったときに逃れているパターンがあるのか？
+
+    // 最大手数を超えている
+    if (ss->ply >= MAX_PLY)
+      return VALUE_ZERO; // Draw Score
+	  →　こう変更して引き分けを回避させよう。
+	  →　これでもV1.64に-R100ほど負け越している感じ。なんなん…。
+	  →　打ち歩詰め絡みで何かやらかしたのか？
+	  → recap深さは、やはり-3のほうが良いということなのか..戻した。
+
+・メモリ8GBのときnormal perft、うまく動かないという報告が。
+→　固定で確保してるんだった…。
+
+
+■ 2016/02/21 V1.64
+
+・nano plusで静止探索、深さ-5までCAPTURESを生成しているの、よくない可能性が微レ存。
+
+  // 静止探索でこれより深い(残り探索深さが少ない)ところではRECAPTURESしか生成しない。
+  DEPTH_QS_RECAPTURES = -3*(int)ONE_PLY,
+
+  →　1.57aと対戦させておく。こっちのほうが明らかに強いな..
+
+・V1.64a
+  
+  // 静止探索でこれより深い(残り探索深さが少ない)ところではRECAPTURESしか生成しない。
+  DEPTH_QS_RECAPTURES = -2*(int)ONE_PLY,
+  →　こう変更するとどうなのだ？
+  →　こっちのほうがわずかに強いっぽい。うわぁぁぁ。
+  今後、これを基準ソフトにしよう..
+
+		50.7%	
+		#16
+		やねうら王nano plus V164a
+		静止探索のRECAPの深さ-3→-2に変更,1スレッド、0.1秒設定
+		#0
+		やねうら王nano plus V164
+		静止探索のRECAPの深さ-5→-3に変更,1スレッド、0.1秒設定
+
+		1687-16-1638(19.8% R5.1)	
+
+
+  →　floodgateに放流しておく。
+
+
+■ 2016/02/21 V1.63
+
+・local server、timeout時にMOVE_RESIGNを返すように変更。
+・local server、非合法手もMOVE_RESIGN扱いするように変更。
+・そのときにエラーを出力するように変更。
+・local server、エンジンを配置するpath変更できるように。
+	→　engine-config.txtのほうでエンジン名にpathが指定されていればいいか…。
+
+
+■ 2016/02/21 V1.62
+
+・打ち歩詰めの処理、LongEffect有り時の高速化
+	→　綺麗には書けた気がする。あまり呼び出し頻度の高くない部分のコードなので高速化には寄与していない気が…。
+
+	===========================
+	Total time (ms) : 16981
+	Nodes searched  : 20291525
+	Nodes/second    : 1194954
+
+	1%ぐらいnpsが上がったのか？ちょっと嬉しい。
+
+・nano-plusのデバッグ用のコード消してなかったの修正。
+
+
+■ 2016/02/21 V1.61
+
+・long effectがあるときにeffected_toは高速化できるのでそのコード追加。
+
+	改良前とbenchのnode数が変わらないことを検証する。
+	===========================
+	Total time (ms) : 17606
+	Nodes searched  : 20291524
+	Nodes/second    : 1152534
+
+	→　変更後。nps 0.2%ぐらい上がった？
+	===========================
+	Total time (ms) : 17578
+	Nodes searched  : 20291524
+	Nodes/second    : 1154370
+
+	ASSERT無効にしてベンチ
+
+	===========================
+	Total time (ms) : 17142
+	Nodes searched  : 20291525
+	Nodes/second    : 1183731
+
+	何故かノード数が1だけ変わる…。do_move()するようなASSERTどこかに入っているのか..？あとで調べる。
+
+	とりあえずこれでcommitして、floodgateに放流しておく。
+
+・nanoとnano plusと対局させておく。
+
+
+
+■ 2016/02/21 V1.60
+
+・pos.legal()の判定おかしいのか。
+
+position startpos moves 7i6h 5c5d 6i7h 3c3d 2g2f 8c8d 7g7f 2b8h+ 7h8h 7a6b 6h7g 3a3b 2f2e 3b3c 4i5h 4a3b 5h6h 4c4d 6h7h 5a4a 5i5h 6a5b 7g8f 7c7d 8f7g 5b4c 5h6i 4a3a B*5b 3a2b 5b6a+ B*9d 6a9d 9c9d B*5b 4c4b 5b6a+ B*4c 6a4c 4b4c 6i5h 6b5c 2e2d 3c2d 7g6f 9d9e 6f6e B*8c 8i7g 6c6d 6e5f 7d7e 7f7e P*7f 7g6e 6d6e 9g9f 9e9f P*2e 2d3c 7e7d 8c7d 9i9f 9a9f P*7e 7d8c B*6c N*8e 8g8f 8e9g+ 8h8g 9g8g 7h8g 9f9g+ 8g7f 8c9d 7f6e P*7f P*9e 9d7b N*9d 7b6c 9d8b+ L*2g 2h2g 5d5e 2g2h G*2g 6e7d
+go btime 169000 wtime 29000 byoyomi 10000
+
+	^飛 王 ★
+
+	★の升に移動する指し手はevasionにはならない。
+	ゆえにpos.legal()の判定、これを考慮しないといけない。
+	effected_to()の仕様がおかしいんだな。修正した。
+
+
+■ 2016/02/21 V1.59
+
+・local server、応答がなくなる原因わかった。bestmove待ちでエンジンがbestmoveを返さないと
+　そのまま待ち状態になるのがいけないのか。1分でtimeoutとしよう。
+
+      // タイムアウトチェック(連続自己対戦で1手に1分以上考えさせない
+      if (now() >= start + 60 * 1000)
+      {
+        sync_cout << "Error : engine timeout" << endl << pos << sync_endl;
+        return MOVE_NONE;
+      }
+
+・また、local server、一行ずつ出力するのをデフォルトとしよう。
+　こちらのほうが、外部から自動操作するときに出力をparseするのが簡単だから。
+
+	// 1行ずつ結果を出力するモード
+	#define ONE_LINE_OUTPUT_MODE
+
+
+■ 2016/02/21 V1.58
+
+・DEPTH_QS_RECAPTURESとりあえず-10にしておく。この値でそんなに悪くはなさそうなので。
+→　また後日調整する。
+
+
+■ 2016/02/20 V1.57b
+
+・local server機能で、プロセスが終了しないとき用の修正。
+	→　これでも終了しないことがあるためprocessのkillも行なうようにした。
+	→　これでもプロセス残ることがある。おかしい。ソース、読みなおす。
+	→　local-serverのidle_loopにsleep(5)を追加。
+	→　長手数による引き分け、条件がMAX_PLYになっていたのを256に修正。
+	→　こっちの問題ではなさげ..
+	→　ソースコード、再度整理する。
+
+
+・nano-plusのrecaptureの指し手生成間違っていたのを修正。
+・nano-plusで静止探索での3手以上延長しないほうがいいのか実験。
+      // 探索深さが-3以下ならこれ以上延長しない。
+      if (param1)
+      {
+        if (depth < -3 * ONE_PLY)
+        {
+          // せっかくevaluateを呼び出したので置換表にhitしていないなら今回のevaluateの値を保存しておく。
+          if (!ttHit)
+            tte->save(posKey, value_to_tt(bestValue, ss->ply), BOUND_LOWER,
+              DEPTH_NONE, MOVE_NONE, ss->staticEval, TT.generation());
+
+          return bestValue;
+        }
+      }
+	  →　なぜかR220ほど下がる。
+	  RECAPTURESの指し手生成なにかおかしいのでは..
+
+	  RECAPのフェーズをparam1依存にして、これでパラメーターを変えた実験をしてみる。
+	  延々、同じ升でRECAPするだけのはずなのにレーティング下がるのなんで…。
+
+      else if (depth > /*DEPTH_QS_RECAPTURES*/ (Depth)(-3-param1))
+        stage = QSEARCH_WITHOUT_CHECKS_START;
+		→　MovePickerでttDepth突っ込んでたから延々とCAPTURESが生成されてたくさい。
+		→　これ修正したらずいぶんマシになった気がする。ベストな値を探す。
+
+
+51.8%	56.0%	59.6%	59.8%	64.6%	62.7%	63.9%	
+#
+やねうら王nano plus V157b
+やねうら王nano plus param1!=0なら静止探索で3手以上延長しない,1スレッド、0.1秒設定
+#0
+やねうら王nano plus V157a
+やねうら王nano plus 静止探索のオーダリングいじった,1スレッド、0.1秒設定
+
+489-0-455(12.7% R12.5)	529-0-415(0.0% R42.2)	561-0-381(0.0% R67.2)	536-0-360(0.0% R69.1)	579-0-317(0.0% R104.6)	562-0-334(0.0% R90.4)	470-0-266(0.0% R98.9)	
+
+		↓条件をこう変えてみる
+
+      else if (depth > /*DEPTH_QS_RECAPTURES*/ (Depth)(-7-param1))
+        stage = QSEARCH_WITHOUT_CHECKS_START;
+
+
+70.3%	65.9%	72.1%	64.0%	65.3%	64.1%	60.0%	
+#13
+やねうら王nano plus V157b
+やねうら王nano plus param1に応じて静止探索のrecapまでの手数変更,1スレッド、0.1秒設定
+#0
+やねうら王nano plus V157a
+やねうら王nano plus 静止探索のオーダリングいじった,1スレッド、0.1秒設定
+
+270-0-114(0.0% R149.8)	244-6-126(0.0% R114.8)	253-1-98(0.0% R164.8)	224-2-126(0.0% R100.0)	226-6-120(0.0% R110.0)	223-4-125(0.0% R100.6)	210-2-140(0.0% R70.4)	
+
+
+
+■ 2016/02/20 V1.57a
+
+・nano-plusで静止探索の1つ目の深さでは、CAPTURESの指し手を生成するように。(+R180)
+・指し手生成に以下の2つを追加
+  QUIET_CHECKS,          // 王手となる指し手(歩の不成などは含まない)で、CAPTURESの指し手は含まない指し手
+  QUIET_CHECKS_ALL,      // 王手となる指し手(歩の不成なども含む)でCAPTURESの指し手は含まない指し手
+
+
+■ 2016/02/20 V1.57
+
+・nano-plusで静止探索で置換表のlookupをするように。(棋力にほぼ影響なさげ..)
+	→　これnanoのものに戻してもいいぐらいだな..。静止探索絡みはminiに持ち越すか…。
+
+・置換表でdepthが深いと1byteに収まらないのでONE_PLYで割った値を格納するように変更。
+・Depthの定数に色々追加。
+
+
+■ 2016/02/19 V1.56
+
+・nano-plusにLMRを追加。+R150
+・静止探索1手詰め + LMRで +R210ぐらいになるはずだが、実際はnanoからはR+145程度のようだ。
+おそらく静止探索1手詰めで強くなっているように見えたのが0.5手延長で強くなるように見えるのと同じ現象で、まやかし。
+
+・local-game-serverでmainスレッド以外がエンジン名を設定しているの危ないので修正。
+
+
+■ 2016/02/19 V1.55
+
+・nano-plusに静止探索でのみ1手詰めを呼び出すようにした。-R20(long effectの更新分)+R70(1手詰めの効果) = +R50(nanoから)
+
+
+■ 2016/02/19 V1.54c
+
+・nano-plusで静止探索での1手詰め
+      {
+        // 1手詰み
+        Move m;
+        if (PvNode && param1)
+          m = pos.mate1ply();
+        else
+          m = MOVE_NONE;
+        if (m != MOVE_NONE)
+          return mate_in(ss->ply);
+      }
+
+・通常探索での一手詰め判定
+    Move bestMove = MOVE_NONE;
+
+    // RootNodeでは1手詰め判定、ややこしくなるのでやらない。
+    // 置換表にhitしたときも1手詰め判定は行われていると思われるのでこの場合もはしょる
+    if (!RootNode && !ttHit && (PvNode && param2))
+    {
+      bestMove = pos.mate1ply();
+      if (bestMove != MOVE_NONE)
+      {
+        // 1手詰めスコアなので確実にvalue > alphaなはず。
+        alpha = mate_in(ss->ply);
+        goto TT_SAVE;
+      }
+    }
+
+
+50.6%	48.7%	
+56.5%	54.2%	
+#1
+やねうら王nano V140
+やねうら王nanoの最終版1スレッド、0.1秒設定
+#7
+やねうら王nano plus V154c
+やねうら王nano plus、1手詰め呼び出し条件の実験,1スレッド、0.1秒設定
+
+2948-0-2876(17.3% R4.3)	2834-0-2990(98.0% R-9.3)	
+3292-0-2532(0.0% R45.6)	3101-0-2616(0.0% R29.5)	
+
+静止探索では無条件で1手詰めを呼ぶのがよさげ。
+自己対戦だと0.5手延長みたくなって、勝率が上がっているだけかも知れないが。
+
+・1.54d
+
+    // RootNodeでは1手詰め判定、ややこしくなるのでやらない。
+    // 置換表にhitしたときも1手詰め判定は行われていると思われるのでこの場合もはしょる
+    if (!RootNode && !ttHit & param1)
+    {
+      bestMove = pos.mate1ply();
+      if (bestMove != MOVE_NONE)
+      {
+        // 1手詰めスコアなので確実にvalue > alphaなはず。
+        alpha = mate_in(ss->ply);
+        goto TT_SAVE;
+      }
+    }
+
+
+	42.0%	54.4%	
+	#1
+	やねうら王nano V140
+	やねうら王nanoの最終版1スレッド、0.1秒設定
+	#8
+	やねうら王nano plus V154d
+	やねうら王nano plus、通常探索で1手詰め呼び出すか,1スレッド、0.1秒設定
+
+	1397-0-1931(100.0% R-56.2)	1710-0-1432(0.0% R30.8)	
+
+	→　呼び出さないほうが強いようだ。
+
+
+
+
+■ 2016/02/18 V1.54
+
+・local server、結果を1行ずつ出力するモード用意。
+・local server、finish時に子プロセスのエンジン開放するためにquitコマンドを送信するように変更。
+・nano-plusでの実験用にoptionとしてParam1,Param2追加。
+
+
+■ 2016/02/18 V1.53
+
+・mate1で漏れているケースがあったので修正。
+sfen p2g3n1/2gn4g/+P1s1k3s/1ppr2+Lbp/1P1p1K2b/4P1Ppl/3+n1P1RP/LS3p1PL/3P+p2NS w Ppg 160
+
+test rp
+Random Player test , loop_max = 100000000
+mate found = 10000 , mate miss = 746 , mate found rate  = 93.0579%
+mate found = 20000 , mate miss = 1460 , mate found rate  = 93.1966%
+mate found = 30000 , mate miss = 2181 , mate found rate  = 93.2227%
+mate found = 40000 , mate miss = 2939 , mate found rate  = 93.1554%
+mate found = 50000 , mate miss = 3759 , mate found rate  = 93.0077%
+mate found = 60000 , mate miss = 4617 , mate found rate  = 92.8548%
+mate found = 70000 , mate miss = 5387 , mate found rate  = 92.8542%
+mate found = 80000 , mate miss = 6204 , mate found rate  = 92.8031%
+mate found = 90000 , mate miss = 6882 , mate found rate  = 92.8965%
+mate found = 100000 , mate miss = 7561 , mate found rate  = 92.9705%
+mate found = 110000 , mate miss = 8327 , mate found rate  = 92.9627%
+
+→　0.2%ほど詰み発見率が上がった。
+
+
+■ 2016/02/18 V1.52
+
+Position.cppで評価関数を使わないときに
+	#ifndef EVAL_NO_USE
+で囲み忘れていたところがあったので修正。
+
+
+■ 2016/02/11 V1.51
+
+・コマンドライン引数の複数コマンドの実行機能を追加。fileからの実行機能も追加。
+
+
+■ 2016/02/10 V1.50
+
+・自己対局サーバー、1スレッド×同時対局(マルチスレッド)に対応させる。goコマンドがThreads数を反映するように。
+	→　マルチスレッド化した。
+
+
+■ 2016/02/09 V1.49
+
+・スレッドまわり改修して、協力詰めエンジンがコンパイル通らなくなっていたの修正。
+
+	MainThread::searchがvirtualなので単にsearchって書くとthink()が呼び出されてしまうので注意。
+	次のように書く必要がある。
+
+	void MainThread::think() {
+	  for (auto th : Threads.slaves) th->start_searching();
+	  Thread::search();
+	  for (auto th : Threads.slaves) th->wait_for_search_finished();
+	}
+	void Thread::search() { HelpMate::id_loop(rootPos, (int)thread_id(), (int)Options["Threads"]); }
+
+
+■ 2016/02/09 V1.48
+
+・Threadまわり全面的に書き直す。
+	→　大改修したら落ちなくなった。やはりそうだったのか…。
+	→　スレッドまわりがすっきりして気分がいい。
+
+・nanoとminiとビルドしなおしてローカル自己対局。
+	→　直ってる気がする。そうか。スレッドまわりだったのか…。
+
+・自己対局のときにコマンドラインではなくファイルから開始コマンドを受け取りたいのでusi.cppを改良。
+	引数で指定されたものを連結して一つのコマンドとして実行する機能があればいいのか…そうか。
+
+	次のような.batファイルを作ってそれを実行すれば連続自己対局が簡単に開始できる。
+	> local-game-server.exe go btime 500
+
+・解説.txtの説明が古かったので刷新。
+
+・スレッドまわり大改修したのでexeフォルダのnanoのバイナリ差し替え。
+
+・shogi.hからマクロ関係をextra/macros.hに移動。
+
+
+■ 2016/02/09 V1.47
+
+・あかん。__mm_mallocが失敗する状況において、newも失敗する。これランタイムおかしいのでは…。
+	revertする。
+
+・Releaseビルド時のランタイムなら落ちない。Debugビルド時のnewでまわり、高負荷時にかち合うと失敗するのでは。
+
+	main threadのnewをするタイミングが早すぎてランタイムの初期化が終わっていないことがあるのでは…。
+	→　main threadのnewは、ThreadPool::init()のなかが最初。これは、main関数のなかのThreads.init()から
+	呼び出される。ということは、問題なさげ。
+
+	そもそも、sizeof(MainThread)==1312しかないのに。
+
+    // Tの基底クラスはstd::threadなのでスライシングされて正しく代入されるはず。
+    *th = std::thread([&] {((T*)th)->idle_loop(); });
+    // →どうもMSVCのデバッグ用ランタイム、これやるとatomic_boolとかの実装と相まってまずいようだ。
+
+
+■ 2016/02/09 V1.46
+
+・自動対局サーバー、ときどき3つ目ぐらいのインスタンス走らへん。原因調査。
+	・自己対局サーバーに子プロセスとの通信ログ出力機能追加。
+
+・Position::material、EVAL_NO_USEのときに参照している箇所があったのでifdefで囲んだ。
+
+・デバッガで再現しない。また、local game server自体が落ちることがある。原因調査。
+	→　どうも負荷状態において _mm_malloc()が失敗して未初期化のポインターが返ってきているような感じなのだが…。
+	→　ランタイムが何か共有してて、同時起動時において初期化がされないのではないかな。MSVC、ひどい実装だな。
+		マルチスレッドデバッグDLLに何かバグがある予感。
+	→　VSからCtrl+F5連打でこの現象が起きる。
+	→　_mm_malloc()自前で実装する。
+
+
+// --------------------
+//  __mm_malloc(),__mm_free()
+// --------------------
+
+// MSVCの__mm_malloc(),__mm_free()が高負荷状態において失敗するので自前で用意。
+// 速度的には遅いがそんなに急所でこの関数を呼び出すわけではないので構わない。
+
+// size = 要求メモリ量(byte単位)、align_size = アライメントするサイズ
+inline void* my_mm_malloc(size_t size, size_t align_size)
+{
+  const auto ptr_alloc = sizeof(void*); // この分余分に確保して[-1]のところに元のポインターを保存しておく。
+  size_t request_size = size + align_size;
+  const auto needed = ptr_alloc + request_size;
+  auto alloc = ::operator new(needed);
+  void* alloc2 = (uint8_t*)alloc + ptr_alloc;
+  auto ptr = std::align(align_size, size, alloc2, request_size);
+  ((void**)ptr)[-1] = alloc;
+  return ptr;
+}
+
+inline void my_mm_free(void* ptr)
+{
+  if (ptr)
+  {
+    void* alloc = ((void**)ptr)[-1];
+    ::operator delete(alloc);
+  }
+}
+
+
+■ 2016/02/09 V1.45
+
+・1手詰め見つけたときにスコアおかしいな。
+	mate distance pruning入れないと駄目なのか
+	→　入れたらなおった..よしよし。
+
+・nano plusにnode stackを導入する。
+
+・nanoとnano plusでbenchでの探索node数が合致するようにする。
+
+	nano
+	===========================
+	Total time (ms) : 13332
+	Nodes searched  : 13282757
+	Nodes/second    : 996306
+
+	nano plus、1手詰めなし、mate distance pruningなし。
+	===========================
+	Total time (ms) : 11896
+	Nodes searched  : 10584735
+	Nodes/second    : 889772
+
+	→　合致しない。ソース比較する。
+	MovePickerが原因としか考えられない。うわー。
+
+	MovePicker nanoにものと差し替えたらnode数合致した。
+	===========================
+	Total time (ms) : 14328
+	Nodes searched  : 13282757
+	Nodes/second    : 927048
+	LONG_EFFECTの更新で7%ぐらい遅くなってるのか..これで利きを使わない評価関数だとだいぶ損だな。
+
+	ああ、MovePicker、ttMoveと先頭のをswapするのでオーダリング違うのか。そうか。
+
+	===========================
+	Total time (ms) : 11129
+	Nodes searched  : 10584735
+	Nodes/second    : 951094
+	LONG_EFFECT更新なしにして7%ぐらい上がった。
+	MovePickerで段階生成にしてるので4%ほど損してるのか。
+	いまの状況だとほぼall nodeになるので仕方ないか。
+
+・nano plusにkiller move実装したら枝刈り性能あがった気がする。
+
+	===========================
+	Total time (ms) : 3863
+	Nodes searched  : 4850357
+	Nodes/second    : 1255593
+
+	bench d 時のdepth上げる。
+
+	===========================
+	Total time (ms) : 12855
+	Nodes searched  : 13773887
+	Nodes/second    : 1071480
+
+・nanoと対局させる。
+	nano VS nano plus
+	62-0-38
+	46-1-53
+	48-0-52
+	166-3-131
+	161-4-135
+	---------
+	483/892=0.54
+
+	killerで枝刈り効率が上がっているはずだが、LONG_EFFECTの更新の7%と
+	MovePickerの逐次化による5%ほどとが回収できてないのか…。大変だな。
+
+
+■ 2016/02/09 V1.44
+
+・benchコマンド追加。
+・MAX_DEPTH、設計良くないな。削除。
+・これに伴い、nano,nano plusのid_loop、修正。
+・benchコマンド完成。
+	→　nano plusのベンチマーク、異常に悪い件。
+	===========================
+	Total time (ms) : 14419
+	Nodes searched  : 11172282
+	Nodes/second    : 774830
+・比較用にnanoもベンチが通るように修正する。
+	nano plusへの修正をbackport
+
+	nanoのほう
+	===========================
+	Total time (ms) : 13476
+	Nodes searched  : 13282757
+	Nodes/second    : 985660
+
+・nano/nano plusのconfigure、testコマンド、デフォルト有効にしておく。
+・nano plus ASSERTなしでbench
+	===========================
+	Total time (ms) : 12411
+	Nodes searched  : 11172282
+	Nodes/second    : 900191
+
+	めっちゃ変わった。どのASSERTがそんなに重いというのか..わからん。
+	MATE1外してみる。
+
+	===========================
+	Total time (ms) : 12257
+	Nodes searched  : 10584735
+	Nodes/second    : 863566
+
+	探索木変わったのでむしろ増えた。
+
+	mate1外してnanoと探索ノード数が同じでないの、おかしい。あとで原因調べる。
+	mate1、non PVでも有効にして、ASSERTなしにして、nanoと対戦させておく。
+
+	non PVでもmate1入れるとnps増えた。mate1で枝刈りされて無駄な指し手生成が端折られたからか？
+	===========================
+	Total time (ms) : 5016
+	Nodes searched  : 5955513
+	Nodes/second    : 1187303
+
+	nano-nano plus
+	112-4-84
+	103-3-94
+	107-0-93
+	少しの負け越しで済んだが、やはり何かおかしいな。
+	benchの探索node数が同じにならないのはバグだろうから、調査する。
+
+
+■ 2016/02/08 V1.43
+
+・nano plusのMovePickerで段階的な指し手生成を実装。
+	→　やってみたがnpsほぼほぼ上がってない。(気がする。)
+	mate1入れたせいもあるのか。
+
+・1手詰め、うまく詰ませられない。
+position startpos moves 1g1f 8c8d 7g7f 8d8e 8h7g 7a6b 6g6f 5a4b 2h8h 5c5d 7i7h 4b3b 3i3h 6b5c 5i4h 3c3d 3g3f 5c4d 7h6g 5d5e 4g4f 6a5b 6i5h 7c7d 5h4g 9c9d 1f1e 2b3c 2i3g 8a7c 4h3i 9d9e 3i2h 3c4b 2g2f 8b8d 6f6e 7c6e 7g6f 8d8a 5g5f 5e5f 6g5f 6c6d 4f4e 4d3c P*5d 5b6c 5f5e 3b2b 3g2e 4a3b 3f3e 3d3e 8h5h 8e8f 5e4f 8f8g+ 2e3c 4b3c 6f3c+ 3b3c 5h5i P*5g B*7b 8a8f 7b6c+ 8g7g 6c6d 8f8h+ 6d6e 7g6h 5i5g 8h8i N*2e 3c3b 6e5e N*3c P*3d N*4b 4f3e 8i7i 5d5c+ B*7h 3d3c+ 2a3c 2e3c+ 3b3c N*2e P*3b 5c4c N*3d 4c3c 3b3c 2e3c+ 2b2a G*2b 3a2b
+go btime 0 wtime 0 byoyomi 30000000
+→　修正した。
+
+・nano-nono plus
+	59-1-40
+	60-1-39
+	47-2-51
+	55-5-40
+	0.56
+
+枝刈りが甘い状況ではmate1にそんなに価値がないのかも。
+PV nodeでだけ呼び出すか。
+→　1手詰め判定は通常探索、静止探索ともにPV nodeのみに変更。
+もう寝るのでこの条件で2000回対戦させておく。
+	318-4-178
+	315-11-174
+	332-5-163
+	330-8-162
+	---------
+	1295-28-677
+	0.656
+	めっちゃ負けてる。おかしい。差分取る。
+	→　mate1は軽いのでnon PVでも入れたほうがいいということか。
+	→　MovePickerで遅くなった分、回収できていないのか。
+	→  bench書く。
+
+・自動対戦サーバー、ときどき3つ目ぐらいのインスタンス走らへん。あとで原因調べる。
+
+
+■ 2016/02/08 V1.42
+
+・nano plus、1手詰め判定追加。
+	87-4-109  R35ほどup？大したことないな。枝刈りが甘いからmate見つけてもリターンが小さいんだな。
+
+・config.h、デフォルトではdefineしないことに。
+・add_hand(),sub_hand()、inlineにしていると内部コンパイルエラーになるときがあるのでshogi.cppのほうで定義するように変更。
+・Depth自体は32bitでいいのでは..
+
+
+■ 2016/02/08 V1.41
+
+・materialの計算もifndef EVAL_NO_USE内に分離
+・clangでコンパイルが通るように。
+	http://llvm.org/releases/download.html
+	> Download LLVM 3.7.1
+	> Clang for Windows (64-bit) (.sig)
+	LLVM-3.7.1でコンパイルが通るように頑張る。
+	→ ClangだとAVX関係が色々難しいみたい。gccならいけそうだが…。
+	gccでコンパイル通すのはまた今度にする。
+
+・これコメントアウト
+
+/*
+// 静止探索時の最大探索深さ
+const int MAX_QUIET_PLY = 6;
+
+// 通常探索時の最大手数である128に、静止探索時の最大深さを加えた定数。
+// 局面バッファ(StateInfo)などは、すべてこのサイズで確保する。
+const int MAX_SEARCH_PLY = MAX_PLY + MAX_QUIET_PLY;
+*/
+
+・DEPTH_MAXが必要なので修正。
+
+
+■ 2016/02/08 V1.40
+
+・実行ファイルを配布するにあたって、定跡ファイルを移動させて、評価関数バイナリの置き場を変更する。
+	将来的に評価関数バイナリを切り替えられるようにする。また、将来的に定跡を複数から選択可能にする。
+
+	eval/kpp16ap.bin
+	eval/kkp32ap.bin
+	book/standard_book.db
+	→ exe/YaneuraOu-nano-readme.txtに詳しく書いた。
+
+・やねうら王nano plusの開発開始。
+	engine/nano-plus-engine追加。
+
+
+■ 2016/02/07 V1.39
+
+・やねうら王nanoの探索部、少し改良
+	→　nonPV用の処理を少し書く。
+	→　そこそこうまく書けた気がする。floodgateに投入しておく。
+	これでR2000ぐらいになっているならnanoの開発はこれにて終了。
+
+
+■ 2016/02/07 V1.38
+
+・差分計算時のテスト
+isready
+position startpos moves 7g7f 8b3b 5i6h 5a6b 2g2f 6b7b 2f2e 3c3d 3i4h 3d3e 8h2b+ 3a2b 2e2d 2c2d 7i7h 5c5d 7h7g 2b2c B*6f B*2b 6f2b+ 3b2b 6h7h 2c3d 4g4f 2d2e 4h4g 2e2f B*6f B*3c 6f3c+ 2a3c 4i3h B*4i B*5f 3d2e 4g5h 4i5h+ 6i5h S*5e B*1e 4a3b 5f4g 5e4f 4g5f 5d5e
+go btime 10000000
+info depth 8 score cp -1502 nodes 16874114 nps 1063204 hashfull 420 time 15871 pv 5f6e 1c1d 1e3c+ 3b3c 3g3f B*4i 5h6h 2e3f
+// 差分計算なし。
+info depth 8 score cp -1502 nodes 16874114 nps 896414 hashfull 420 time 18824 pv 5f6e 1c1d 1e3c+ 3b3c 3g3f B*4i 5h6h 2e3f
+17%ぐらいnps up!!
+計算合った。これで良し。
+
+・EVAL_KPP、差分計算、実装完了。
+・read_book()、デバッグ中だったの戻した。
+・DirtyPiece型導入。
+・StateInfoからkingSquare除く。
+
+
+■ 2016/02/07 V1.37
+
+・Eval::compute_eval()で全計算して初期化する。
+・差分で遡るの1局面前までに限定する。
+
+・差分計算デバッグ中。
+・README.md、整形
+
+
+■ 2016/02/07 V1.36
+
+・KPP評価関数の差分計算まわり。
+
+・StateInfoにdirtyPiece追加。
+・Eval/evaluate_kpp分離
+・Eval/evaluate_bona_piece分離
+・shogi.hのほうに
+	int hand_count(Hand hand, Piece pr) { ASSERT_LV2(PIECE_HAND_ZERO <= pr && pr < PIECE_HAND_NB); return (hand >> PIECE_BITS[pr]) & PIECE_BIT_MASK[pr]; }
+	int hand_exists(Hand hand, Piece pr) { ASSERT_LV2(PIECE_HAND_ZERO <= pr && pr < PIECE_HAND_NB); return hand & PIECE_BIT_MASK2[pr]; }
+を書くと内部コンパイルエラーになるのでshogi.cppのほうに移動。
+・EVAL_KPPのevaluateに差分計算追加。
+・kingSquare、StateInfoに移動させる。
+
+
+■ 2016/02/06 V1.35
+
+・nanoのid_loopまわり、ちょっと整理した。
+
+
+■ 2016/02/06 V1.34
+
+・定跡DBの読み書き、std::mapではなくstd::unorder_mapを使うように変更。
+
+
+■ 2016/02/05 V1.33
+
+・定跡ファイルに定跡フォーマットのバージョン識別文字列を追加。
+
+
+■ 2016/02/05 V1.32
+
+・定跡にその指し手が採択された回数の項目を追加。
+・nanoで定跡の指し手に関して、採択確率を出力するようにした。(将棋所ではこれでうまく表示される)
+
+
+■ 2016/02/05 V1.31
+
+・extra/book.hとcpp追加。
+・test_cmd.cppから移動。
+・bookの読み込み、書き込み等の操作を細かくして追加。
+・read_all_lines()でエラーのときに1を返すように。
+・nanoの定跡にbook.dbを用いるように変更した。
+
+
+■ 2016/02/05 V1.30
+
+・定跡部、何かフレームワークからのサポートを考える。
+→　考えた。解説に書いた。nano以外ではこれを使うことにする。
+・read_all_lines()、空行はskipするように。
+・makebookコマンド、sfen→db変換実装した。
+・doc/nano-book.db削除。
+・doc/book.db追加。
+
+
+■ 2016/02/05 V1.29
+
+・nanoの秒読み時の使用時間、もう少し少なくしないとtime upになるので修正。
+・USIオプションに"NetworkDelay"追加。
+・YaneuraOuMini_ja.txt → YaneuraOu_ja.txtにリネーム
+　バイナリは全部YaneuraOu.exeでいいや。
+
+
+■ 2016/02/04 V1.28
+
+・nano、floodgateに放流している人を見るとR1700ぐらいらしい。もう少しチューンする。
+・nanoの静止探索で王手がかかっているならalpha = -VALUE_INFINITEにして、
+	あと静止探索の延長は3手までにする。
+	→　少し強くなった気が。
+
+・nanoの静止探索の指し手生成、RECAPTURESからCAPTURES_PRO_PLUSに変更してみる。
+	→　弱くなった。
+・Position::is_ok()にcheckesの検証を追加。
+・CAPTURES_PRO_PLUSで歩の成りに自駒のある場所を除外していなかったのを修正。
+
+position startpos moves 2g2f 3c3d 7g7f 8c8d 2f2e 1c1d 2e2d 2c2d 2h2d
+go btime 169000 wtime 17100000 byoyomi 0
+
+・検証用のコード
+      for (auto p = currentMoves; p != endMoves; ++p)
+        if (!pos.pseudo_legal(*p))
+        {
+          cout << pos << *p;
+          for (auto m : MoveList<CAPTURES_PRO_PLUS>(pos))
+            cout << m.move << " ";
+        }
+
+・nanoに定跡追加。
+　　→　序盤、少しだけマシになった。
+
+・misc.h/cppにread_all_lines()追加。
+・プロジェクトのdoc/nano-book.sfen追加。
+
+・対局中おかしかった局面のテスト
+position startpos moves 7g7f 8b3b 5i6h 5a6b 2g2f 6b7b 2f2e 3c3d 3i4h 3d3e 8h2b+ 3a2b 2e2d 2c2d 7i7h 5c5d 7h7g 2b2c B*6f B*2b 6f2b+ 3b2b 6h7h 2c3d 4g4f 2d2e 4h4g 2e2f B*6f B*3c 6f3c+ 2a3c 4i3h B*4i B*5f 3d2e 4g5h 4i5h+ 6i5h S*5e B*1e 4a3b 5f4g 5e4f 4g5f 5d5e
+go btime 10000000
+
+・nanoの通常探索の指し手生成、CAPTURESさきに生成すると枝刈り性能が上がるはず。→　少し強くなった。
+
+・あと探索の並列化と評価関数の差分更新をやるとR200ぐらい上がるかも。
+
+・2016年1月の作業メモから完了分
+
+【完了】・1手詰め判定ルーチン、影の利きを考慮した詰み
+【完成】・1手詰め判定ルーチン、打ちと移動による簡単な詰み
+【完成】・undo_move()で利きの差分更新処理(戻す処理)、実装完了。ランダムプレイヤーによる自動テストをpassした。
+【完成】・do_move()での利きの差分更新処理が正しいかをランダムプレイヤーによる自動テストにより確認。
+【完成】・Position::do_move()のときのcaptureとnon_captureのときの利きの差分更新処理
+【完成】・Position::do_move()のdropのときの利きの差分更新処理
+【完成】・Long Effect Library
+【完成】・利きの初期化処理
+【完成】・自動対局サーバーの開始局面のランダマイズ機能
+【完成】・自動対局サーバー機能、書けた。
+【完成】・32bit環境用のコード、ちゃんと動くようになった。(手元に32bit環境がないので実際の環境で試してはいない。)
+
+
+■ 2016/02/01 V1.27
+
+・mate1plyで漏れているケースをいくつか修正。
+sfen 1nk3G2/l4+RGb1/s1p5l/n2p3pp/1p1PP4/4KPPP1/NPP1S3P/LR3ppGL/B2+p+n1S2 b 2PSG 123
+→詰むようになった。0.1%ほど詰み発見率が上がった。
+
+sfen +P1+Lg1S+P1b/+P2k4p/1N1l1+R2n/1LG1Gp2L/S5p2/1PPP1g1p1/B3R3n/pp2+n1KsP/1S4P2 b 2P2p 203
+→詰むようにした。0.2%ほど詰み発見率が上がった。
+
+・USI拡張コマンドとして"mate1"コマンド追加。
+
+test rp
+Random Player test , loop_max = 100000000
+mate found = 10000 , mate miss = 793 , mate found rate  = 92.6526%
+mate found = 20000 , mate miss = 1524 , mate found rate  = 92.9195%
+mate found = 30000 , mate miss = 2257 , mate found rate  = 93.0031%
+mate found = 40000 , mate miss = 3035 , mate found rate  = 92.9476%
+mate found = 50000 , mate miss = 3877 , mate found rate  = 92.804%
+mate found = 60000 , mate miss = 4764 , mate found rate  = 92.6441%
+mate found = 70000 , mate miss = 5544 , mate found rate  = 92.6612%
+mate found = 80000 , mate miss = 6376 , mate found rate  = 92.6183%
+mate found = 90000 , mate miss = 7079 , mate found rate  = 92.708%
+mate found = 100000 , mate miss = 7795 , mate found rate  = 92.7687%
+mate found = 110000 , mate miss = 8561 , mate found rate  = 92.7792%
+mate found = 120000 , mate miss = 9318 , mate found rate  = 92.7945%
+
+
+■ 2016/02/01 V1.26
+
+・static const排除。実行ファイルのサイズが20KBほど縮んだ。
+　悪い影響はなさそうなのでこれでいく。
+・Recaptureの指し手生成器、作る。
+・movegenの指し手生成、選択式のするのやめる。どうせ呼び出していなければリンカーで削除される。
+・NON_EVASIONS_ALL追加。
+　→　呼びださなければ実行ファイル、1バイトも増えない。よしよし。
+・nanoの静止探索、RECAPTURESを使って書き換え。
+
+
+■ 2016/01/31 V1.25
+
+・nanoの静止探索、standPatと比較するの忘れてた。修正。
+→　修正したら少し強くなった感。
+
+
+■ 2016/01/31 V1.24
+
+・評価値、局面の差分更新をしたときにおかしくなるので、駒番号まわりのテストコード追加する。
+→　難しい。書きにくい。
+・BonaPieceの文字列での出力関数実装
+・evalstatにPieceListの内容を表示、追加。
+・test rpコマンドのランダムプレイヤーに評価値の差分計算のチェック機構追加。
+・undo_move()で駒番号おかしくなっていたの修正。
+・mateのときの手数表示がおかしいの修正。
+
+
+■ 2016/01/31 V1.23
+
+・nanoのデバッグ進める。
+・USI::score_to_usi()追加
+・USI::pv()追加。
+・評価関数の値がおかしい気がしなくもない。
+・sfenコマンド追加。(以前のものを変更)
+
+
+■ 2016/01/31 V1.22
+
+・nanoにはsee使わない。
+・nanoの静止探索書く。
+・nanoにid_loop導入。
+・TanspositionTableにvalue_to_tt()とか追加する。
+・goコマンドのデフォルトを秒読み1秒にしておく。(テストしにくいので)
+・USI::Optionのコンストラクタで、on_changeのイベントハンドラを呼び出すように変更。
+	→　この設計だと駄目なのか。仕方ないので置換表のコンストラクタでデフォルト16MB確保する。
+・USI::pv()追加。読み筋表示用。
+
+
+■ 2016/01/30 V1.21
+
+・Position::sse()追加。
+・extra/see.cpp追加。
+・USE_SEE追加。
+
+
+■ 2016/01/29 V1.20
+
+・評価関数、旧バージョンと値の比較。
+・EvalList::set_piece修正。
+
+position sfen lnsgkgsnl/1r5b1/pppppppp1/9/9/2P5p/PP1PPPPP1/LB5R1/1NSGKGSNL w p 8
+
+
+■ 2016/01/27 V1.19
+
+・やねうら王nanoとminiの探索部書いていく。
+・評価関数のimportしてくるところから。
+　→　だいたい出来た気がする
+・put_pieceで落ちる。
+  → 王手がかかっているのにEVASIONS呼び出さなかったからか。
+> position startpos moves 3i4h 3c3d
+> position startpos moves 7g7f 3c3d 8h2b
+evalおかしい。何これ。
+
+
+■ 2016/01/27 V1.18
+
+・Bitobardのoperator == () がまさかの高速化。これ、そもそもほとんど使ってないのであまり変わらんが…。
+
+
+■ 2016/01/25 V1.17
+
+・ByteBoard、WordBoard、無理やり取ってくるなら端にpaddingしといたほうが無難か…。
+
+■ 2016/01/24 V1.16
+
+・1手詰めに影の利きを考慮した詰みも追加。
+・1手詰めで漏れているケースもう少し追加する。
+・uint8_t -> u8とかtypedefする
+・24近傍の9近傍への長い利きを回収するコード追加。
+・mate1plyの移動による詰みをlambdaに変更。
+・1手詰め判定で影の利き考慮するようにした。
+
+test rp
+Random Player test , loop_max = 100000000
+mate found = 10000 , mate miss = 827 , mate found rate  = 92.3617%
+mate found = 20000 , mate miss = 1590 , mate found rate  = 92.6355%
+mate found = 30000 , mate miss = 2354 , mate found rate  = 92.7242%
+mate found = 40000 , mate miss = 3190 , mate found rate  = 92.614%
+mate found = 50000 , mate miss = 4072 , mate found rate  = 92.4693%
+mate found = 60000 , mate miss = 5015 , mate found rate  = 92.2864%
+mate found = 70000 , mate miss = 5822 , mate found rate  = 92.3215%
+mate found = 80000 , mate miss = 6704 , mate found rate  = 92.2679%
+mate found = 90000 , mate miss = 7435 , mate found rate  = 92.3693%
+mate found = 100000 , mate miss = 8202 , mate found rate  = 92.4197%
+mate found = 110000 , mate miss = 8984 , mate found rate  = 92.4494%
+
+詰み率 92%ちょいぐらいになった。8%ぐらいが影の利きありでの1手詰めなのか。
+
+ランダムプレイヤーで数時間まわしておく。
+→　1.6億局面をpassしたのでうまく動いてるやろ…。
+
+
+■ 2016/01/23 V1.15
+
+・dirs_bw_of()→long_effect_ofとリネーム
+・mate1plyの判定率、ランダムプレイヤーで計測できるようにした。
+
+Random Player test , loop_max = 100000000
+mate found = 10000 , mate miss = 28848 , mate found rate  = 25.7414%
+mate found = 20000 , mate miss = 58089 , mate found rate  = 25.6118%
+mate found = 30000 , mate miss = 87252 , mate found rate  = 25.5859%
+mate found = 40000 , mate miss = 116252 , mate found rate  = 25.5997%
+mate found = 50000 , mate miss = 146594 , mate found rate  = 25.4331%
+mate found = 60000 , mate miss = 176384 , mate found rate  = 25.3824%
+mate found = 70000 , mate miss = 206668 , mate found rate  = 25.3011%
+mate found = 80000 , mate miss = 237090 , mate found rate  = 25.2294%
+→　おかしい。低すぎ。
+
+・移動による詰み、駒打ち用のdirectionsテーブルではまずいのか…。修正した。
+
+test rp
+Random Player test , loop_max = 100000000
+mate found = 10000 , mate miss = 1590 , mate found rate  = 86.2813%
+mate found = 20000 , mate miss = 3134 , mate found rate  = 86.4528%
+mate found = 30000 , mate miss = 4722 , mate found rate  = 86.4006%
+mate found = 40000 , mate miss = 6296 , mate found rate  = 86.4006%
+mate found = 50000 , mate miss = 7953 , mate found rate  = 86.2768%
+mate found = 60000 , mate miss = 9620 , mate found rate  = 86.1821%
+mate found = 70000 , mate miss = 11028 , mate found rate  = 86.3899%
+mate found = 80000 , mate miss = 12651 , mate found rate  = 86.3455%
+mate found = 90000 , mate miss = 14175 , mate found rate  = 86.3931%
+mate found = 100000 , mate miss = 15725 , mate found rate  = 86.4118%
+→　だいぶ上がった。もう少し上がって欲しい気が。
+
+
+
+■ 2016/01/23 V1.14
+
+・do_move()に関するベンチが要るな。
+	test rpbenchコマンド追加。書けた。4600 games/sec程度。
+	1局が大抵256手まで行くことを考えると256×4600回の指し手生成 + do_move()/undo_move()だから妥当なところ？
+	ASSERT、long_effectオフにしたら6327 gps
+	long_effectだけオフにしたら5909gps
+	ASSERTだけオフにしたら4959 gps。
+	・ASSERTで5%ほど低下。long_effectは探索部と評価関数がなしだとすると30%ぐらい低下ということなのかな。
+・Effect8に各駒の利き追加する
+・1手詰め作っていく。
+・UnitTestにMate1Ply関連のテストコード追加。
+・HAND_KIND_ZERO追加。
+・PRO_GOLD→QUEENに変更してeffects_fromにQUEEN追加。
+・effects_fromにNO_PIECEのときの処理追加。
+・駒打ちによる1手詰め判定できるようになった。
+・桂の移動による1手詰め判定できるようになった。
+・銀の移動による1手詰め判定うまく動いた。
+・ランダムプレイヤーで1手詰め判定の自動テストするコードを追加。
+・pseudo_legal()で金の成る手のチェックが抜けていたのを修正。
+・1手詰めでの大駒による長い利きの遮断修正。
+・1手詰めで桂打ちで利きを遮断するケース考慮。
+・ランダムプレイヤーでランニング。動いているようだ。
+
+
+■ 2016/01/22 V1.13
+
+・undo_move()で戻す処理に利きを戻す処理も書くことにする。たぶん、そんなに遅くないはずで…。
+・undo_move()も先後分けた。
+・LongEffectLibraryに利きの更新の逆変換関数追加。
+・ランダムプレイヤーで利きのrevertのテスト。
+　このまましばらくランニングさせておく。
+・関数の名前revertでなくrewindにしよう。
+・Position::set_effect、LongEffect::に移動。
+
+
+■ 2016/01/22 V1.12
+
+・captureとnon_captureのときの利きの更新処理追加。
+　→　これで利きの更新処理は一通り書けた。あとは…
+・ランダムプレイヤーによる利きの更新の自動テスト追加。
+・UNREACHABLE、ASSERT_LV3に変更。
+・undo_moveで利きを巻き戻す作業がいるのか..これは難しい..
+・LSB32/64にASSERT_LV3追加。
+・利きのdo_move()での更新はこれで問題なさげ。undo_move()をどうするか考え中。
+
+
+■ 2016/01/22 V1.11
+
+・長い利き、WordBoardでないとまずいのか…。書き直し。
+・make_piece()引数の順番変更。Colorをつねに先に。
+・ENABLE_BIT_OPERATORS_ONに operator &= などを追加。
+・WordBoardの表示修正。
+・利きの初期化部、マクロいくつか削除。
+・LongEffect::dir_bw_of()追加。
+・Directionsのenumに定数追加。
+・Position::do_move()のdropのときの利きの更新処理書けた。
+　あとはcaptureとnon_captureのときの利きの更新処理！
+
+
+■ 2016/01/21 V1.10
+
+・has_long_effect()追加。
+・↑をUnitTestに追加。
+・UPDATE_EFFECT_BY_PUTTING_PIECE、マクロ化した。(利きの差分更新のところでも使うため。)
+・LONG_EFFECTにINCもDECも要らんかった。一つにまとめた。
+・Direction削除。Effect8のものを持ってきて、これを使うことにする。
+・SQWW_RIGHT→SQWW_Rとかにリネーム。
+・Position::do_move()を内部的に、先後分ける。
+・pop_lsb(uint8_t)追加。
+・pop_directionsの引数変更。
+・ENABLE_BIT_OPERATORS_ON追加。
+・Directionsにbegin(),end()追加。
+→　あかん。よくなかった。削除。
+・pop_lsb()をbitop.hに移動。templateで書くことにした。
+
+
+■ 2016/01/20 V1.09
+
+・Effect8::directions_of()追加。
+・長い利きの初期化コード書けた。→　正しそう。
+・ByteBoardの出力関数書いた。
+・MAX_PLY_ → MAX_PLY_NUMにリネーム。
+・LONG_EFFECT→LONG_EFFECT_LIBRARYにリネーム。
+・long_effect.h/cpp、ifdef LONG_EFFECT_LIBRARYで囲った。
+
+
+■ 2016/01/19 V1.08
+
+・user.cpp、わかりにくいのでuser-engine.cppにリネーム。
+・Positionクラスに利きを持たせる。
+・利きの初期化コードおよび差分更新コードを追加する。
+・Position::set_effect()書いた。
+・評価関数、shogi.hで選択可能にする。(まずは準備だけ)
+・config.h、書式整えた。
+
+
+■ 2016/01/19 V1.07
+
+・SquareWithWall追加。これを使って利き関係の初期化処理を書き直す。
+・dist、これがあれば不要？ → 不要ではなかった。
+・LongEffectライブラリにSquareWithWallの差分値追加。
+
+
+■ 2016/01/19 V1.06
+
+・aligned_stack、内部的にvectorを使うように変更。
+
+
+■ 2016/01/19 V1.05
+
+・std::stack<StateInfo>を用いるときにpush()に対して内部的にstackがStateInfoをnewするのだが
+　これがalignmentされてなくてまずいのか…。そんな問題があるのか…。
+→　StateInfoにcustom new/delete追加。
+
+  // custom allocator(このクラスはstd::stack<StateInfo>のpush()によって内部的にnewされるが、そのときに
+  // alignasが無視されるので、custom allocatorが必要になる…ようだ。)
+  static void* operator new (std::size_t count){ return _mm_malloc(count,alignof(StateInfo));  }
+  static void operator delete(void* p) { _mm_free(p); }
+
+→　これでも駄目なのか。難しい…。
+
+// C++11では、std::stack<StateInfo>がalignasを無視するために、代わりにstack相当のものを自作。
+template <typename T> struct aligned_stack {
+  void push(const T& t) { auto ptr = (T*)_mm_malloc(sizeof(T), alignof(T)); *ptr = t; container.push(ptr); }
+  T& top() const { return *container.top(); }
+  ~aligned_stack() { while (container.size()) { auto ptr = container.top(); _mm_free(ptr); container.pop(); } }
+private:
+  std::stack<T*> container;
+};
+こうしてみた。
+
+
+■ 2016/01/19 V1.04
+
+・engine/mate-engine/ 追加。このあとコードを書いていく。
+
+
+■ 2016/01/19 V1.03
+
+・自動対局フレームワークの開始局面をランダマイズする機能追加。
+ →　定跡を読み込めるようにした。
+
+
+■ 2016/01/19 V1.02
+
+・move_from_usi()に合法チェック追加。
+・連続自動対局フレームワーク、一通り動くようになった。
+ →　対局開始局面のrandomize出来たほうがいいので何か考える。
+
+
+■ 2016/01/18 V1.01
+
+・連続自己対戦サーバー用のProcessNegotiatorで入出力のリダイレクトは出来るようになった。
+　あとはこれを非同期入出力にして連続自己対局が出来るようにすればOk.
+
+
+■ 2016/01/18 V1.00
+
+・連続自己対戦サーバー機能追加作業開始。
+	engine/local-game-server
+・"Version"がwindows.hの内部の文字列と衝突した。"ENGINE_VERSION"にリネーム。
+・_mm_malloc()～_mm_free()を使うように変更。
+
+
+■ 2016/01/18 V0.99
+
+・bitop.hとkey128.hのコメント掃除。
+
+
+■ 2016/01/18 V0.98
+
+・128bit hash keyを用いるときにalignmentが合ってないエラーがでうるのを修正。
+
+
+■ 2016/01/18 V0.97
+
+・x86で正常動作するようになった。指し手生成とか半分ぐらいの速度しか出ないが…。
+・aligned_allocをbitop.hに移動させた。
+
+
+■ 2016/01/18 V0.96
+
+・size_t、x86環境だと32bitなのか…。ランダムプレイヤー修正。
+・ランダムプレイヤー、GitHubにpushするの忘れてたので追加。
+
+
+■ 2016/01/18 V0.95
+
+・x86用のコード、allocatorだけ追加しておく。
+・USE_AVX2をコメントアウトしたときにコンパイルが通らなくなっていたの修正。
+
+
+■ 2016/01/18 V0.94
+
+・Stockfishの升の差分を表現するDELTA_Nとか読みにくくてカナワンので、SQ_UPとかに変更。
+
+
+■ 2016/01/18 V0.93
+
+・engine関係、ひとつのフォルダにまとめる
+・ランダムプレイヤーをengineとして追加。
+・とりあえず、ビルドのデフォルトをランダムプレイヤーにしておく。(やねうら王miniの探索部が書けたらそれをデフォルトに変更する)
+・StateInfo,Positionクラスのアライメントの調整をしたせいか、指し手生成が少し速くなったようだ。指し手生成祭りの局面で5.4M回/s程度(Core i7 4771にて)
+・PRNGクラス、少しメンバー追加した。
+
+
+■ 2016/01/18 V0.92
+
+・x86用にコード修正。コンパイルは通るようになったが、Bitboardの代入等で落ちる。(アライメント合ってないから？)
+コンパイル時に、こんな警告。
+> source\thread.cpp(15): warning C4316: 'MainThread': ヒープで割り当てられたオブジェクトが 16 にアラインメントされていない可能性があります
+	→　thread.cppのnewしているところでaligned_new<T>()みたいなものが必要っぽいのだが、これを修正しても
+　ランタイムで落ちるようだ。よくわからんので誰か助けて欲しい…。
+・よく考えるとKey256を使う場合も_mm256_store_si256()が32byteでアライメントされていることを要求するから、
+	これと同じ問題があるのか…。誰も使ってないだろうからそっちはまあいいか…。
+
+■ 2016/01/17 V0.91
+
+・x86用のemulation code、各種追加。
+
+■ 2016/01/17 V0.90
+
+・GitHubにて公開。
+

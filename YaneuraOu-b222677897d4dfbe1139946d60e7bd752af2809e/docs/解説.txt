@@ -1,0 +1,232 @@
+﻿
+■　ファイルの説明
+
+docs/
+source/
+  nano-engine/          やねうら王nano関連の探索部
+  nano-plus-engine/     やねうら王nano plus関連の探索部
+  mini-engine/          やねうら王mini関連の探索部
+  classic-engine/       やねうら王classic関連の探索部
+  2016-engine/          やねうら王2016の探索部(非公開)
+  help-mate-engine/     やねうら王 協力詰めsolver関連
+  random-player-engine/ ランダムプレイヤー
+  local-game-server/    自動対局フレームワーク
+  user-engine/          ユーザーが独自のエンジンを作るときの作業用フォルダ
+
+  shogi.h/.cpp          コンパイル時の設定や、各種構造体の定義。
+  bitboard.h/.cpp       Bitboard(盤面の駒のある場所や、ある駒による利きなどを表現するのに使う)
+  evaluate.h/.cpp       評価関数
+  misc.h/.cpp           バージョン情報など
+  movegen.cpp           指し手生成器(おそらく世界最速)
+  position.h/.cpp       盤面クラス
+  search.h/.cpp         探索部
+  thread.h/.cpp         スレッド関係
+  tt.h/.cpp             置換表
+  usi.cpp               USIプロトコルによる入出力
+
+  extra/                やねうら王nanoでは削除する(or 用いない)予定の拡張クラス
+    all.h               すべてのheaderをincludeする横着なheader
+    bitop.h             SSE、AVXの命令をsoftwareでemulationするためのマクロ群
+    config.h            shogi.hで設定されたコンパイルオプションに基づき、configurationを行なう。
+    key128.h            128bit,256bitのhash key。(実験用)
+    long_effect.h/.cpp  遠方駒による長い利きとBitboardなどへの変換子
+    mate1ply.h/.cpp     超高速1手詰め判定関数(おそらく世界最速)
+    test_cmd.cpp        UnitTestなど。USI拡張コマンドの"test"コマンド関係。
+
+  eval/
+	evaluate_no_eval.cpp      評価関数なしのときのダミーヘッダ
+	evaluate_material.cpp     駒割りに関する評価関数
+    evaluate_bona_piece.cpp   BonaPieceを用いるときの共通ヘッダ
+	evaluate_kpp.cpp          KPP型の3駒の評価関数
+	
+
+■　解説記事等
+
+やねうら王mini公式より解説記事が一通り読めます。
+http://yaneuraou.yaneu.com/YaneuraOu_Mini/ 
+
+やねうら王公式には、コンピューター将棋関係の記事・資料が盛りだくさん！
+http://yaneuraou.yaneu.com/
+
+
+■　コンパイル方法
+
+Visual Studio 2015 Community Edition(無料で使えます)でビルド一発で実行ファイルが出来るはずです。
+
+実行ファイル等は、プロジェクトフォルダの一つ上のフォルダ配下に以下のように作られます。
+
+  YaneuraOu2016Engine/YaneuraOu.exe
+
+★　思考エンジンの種類の選択
+
+ビルドする思考エンジンの種類として、
+
+・ランダムプレイヤー
+・やねうら王nano
+・やねうら王nano plus
+・やねうら王mini
+・やねうら王classic
+・やねうら王 協力詰めsolver
+・ランダムプレイヤー
+・連続自動対局フレームワーク
+
+のなかから選択することが出来ます。詳しくはshogi.hをご覧ください。
+
+そのときの開発中のエンジンがdefineされていることが多いのでビルドしたいエンジンを選択してください。
+
+
+■ よくある質問
+
+★　AVX2非対応のCPU用の実行ファイルの作り方。
+
+shogi.hで
+#define USE_AVX2
+をコメントアウトします。
+
+例)
+// #define USE_AVX2
+
+このままだと、コンパイルは通りますが、コンパイラが(明示的にAVX2の命令を使っていなくとも)
+AVX2用のコードを生成しますので、Visual Studioで以下のところを変更します。
+
+メニューの[デバッグ]→[YaneuraOuのプロパティ]→構成のプロパティ→C/C++
+→コード生成→「拡張命令セットを有効にする」のところ、/arch:AVX2が指定されてると
+思いますけど、それをご自分の環境に合わせる。
+
+
+★　SSE4.2非対応のCPU用の実行ファイルの作り方
+
+SSE4.2非対応ということはAVX2も非対応のはずなので、上のAVX2非対応のときの設定を行ない、
+さらに、shogi.hで
+#define USE_SSE42
+をコメントアウトします。
+
+例
+// #define USE_SSE42
+
+
+★　32bit環境用の実行ファイルの作り方
+
+メニューの[ビルド]→構成マネージャー
+→「アクティブソリューションプラットフォーム」
+を x86 にすれば32bit環境(32bit OS)で動作する実行ファイルが出来るはず。
+(実行が遅くなるので64bit環境推奨です。)
+
+スタックサイズは400MBだとスレッド生成のときにランタイムが落ちるようです。(VC++2015のランタイム側の問題？)
+100MBなら大丈夫のようです。
+
+
+★　長手数の協力詰めで探索深さが深くなると実行中に落ちる。
+
+実行時のスタックが足りないためだと思います。
+
+メニューの[デバッグ]→[YaneuraOuのプロパティ]→構成のプロパティ→リンカー
+→ システム → スタックのサイズの設定を
+419430400  (400MB)ぐらいの大きな数に。(これで手数が4万手ぐらいの問題でもスタック的には足りるようです)
+
+スタックサイズは400MBだとスレッド生成のときにランタイムが落ちるようです。(VC++2015のランタイム側の問題？)
+100MBなら大丈夫のようです。
+
+
+■　連続自動対局フレームワークの使い方
+
+shogi.hの
+#define LOCAL_GAME_SERVER
+を有効にしてビルド。
+
+この実行ファイルと同じフォルダに次の2つのファイルを配置。
+
+  engine-config1.txt : 1つ目の思考エンジン
+  engine-config2.txt : 2つ目の思考エンジン
+  
+    1行目にengineの実行ファイル名(同じフォルダに配置)
+    2行目に思考時のコマンド
+    3行目以降にsetoption等、初期化時に思考エンジンに送りたいコマンドを書く。
+
+  例)
+    test.exe
+    go btime 100 wtime 100 byoyomi 0
+    setoption name Threads value 1
+    setoption name Hash value 1024
+
+  次に
+  goコマンドを打つ。
+  stopもしくはquitで終了するまで対局結果が出力される。
+
+  O : engine1勝ち
+  X : engine1負け
+  . : 引き分け
+
+  対局回数の指定など)
+    go btime [対局回数] wtime [定跡の手数] byoyomi [予約]
+
+    定跡はbook.sfenとしてsfen形式のファイルを与える。1行に1局が書かれているものとする。
+    このなかからランダムに1行が選ばれてその手数は上のwtimeのところで指定した手数まで進められる。
+    デフォルトでは対局回数は100回。定跡の手数は32手目から。
+
+　コマンドラインから入力した文字列を連結して、USIコマンドとして実行する機能があるので、
+　これを用いて、次のような.batファイルを作ってそれを実行すれば連続自己対局が簡単に開始できる。
+
+	> local-game-server.exe go btime 500
+
+	例えば、
+	setoption name Threads value 6
+	のようにして実行すると6スレッド(×2プロセス)が起動して、6局並列で対局が進行する。
+	btimeで指定した数の6倍の数の対局数が行われる。
+
+
+■　内部コンパイルエラーでコンパイル出来ない件
+
+Visual Studio 2015であるなら、アップデート(2016年2月14日現在、最新版がUpdate1)を適用してください。
+しかしVisual Studio 2015 Update1で、ときどき内部コンパイルエラーでコンパイル出来ないことがあります。
+
+ビルド→ソリューションのクリーンしたあとにコンパイルするとなおることがあります。
+あとは、DebugでビルドしてReleaseに戻すだとか。Visual Studioを再起動するだとか。
+データベースファイル(sdf)を削除してみるだとか。
+
+次のVisual Studioのupdateで直って欲しいですね…。
+
+
+■　定跡の作り方
+
+	[定跡フォーマット]
+	sfen sfen文字列
+	この局面での指し手1 相手の応手1 この指し手を指したときの評価値 そのときの探索深さ その指し手が選択された回数
+	この局面での指し手2 相手の応手2 この指し手を指したときの評価値 そのときの探索深さ その指し手が選択された回数
+	…
+	sfen xxxx..
+	相手の応手がないときは"none"と書いておく。
+
+	例)
+	sfen lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1
+	7g7f 3c3d 0 32 2
+	sfen lnsgkgsnl/1r5b1/ppppppppp/9/9/2P6/PP1PPPPPP/1B5R1/LNSGKGSNL w - 2
+	3c3d 2g2f 0 32 1
+
+	あと、先頭にDBのフォーマットのバージョン識別用の文字列として次の文字列を入れておく。
+	#YANEURAOU-DB2016 1.00
+	
+> makebook from_sfen book.sfen standard_book.db moves 16
+
+1行1局の棋譜を読み込ませてそれを上のフォーマットに変換する。standard_book.dbになる。
+各局、"moves"のあとに指定した手数までを出力する。このファイルを思考エンジンの実行ファイル配下のbookフォルダに配置する。
+
+floodgateのよさ気な棋譜をsfenに変換してこのコマンドで定跡を作成したものをexe/book/standard_book.dbに入れてあります。ご自由にお使いください。
+
+
+■　起動時のコマンドの指定
+
+> YaneuraOu-nano.exe go btime 100 wtime 100 byoyomi 0
+
+のようにUSIコマンドをコマンドライン引数として渡すことが出来る。
+コマンドを実行すると思考エンジンを終了する。
+
+> YaneuraOu-nano.exe posision xxx , go btime 100 wtime 100 byoyomi 0
+
+のようにカンマで区切って複数のコマンドを渡すことができる。
+
+> YaneuraOu-nano.exe file cmd.txt
+
+のようにしてコマンドとして実行したいコマンドをファイルから渡すことが出来る。
+
+※　複数のコマンドを渡せるのでquitしたい場合は最後にquitを手打ちすること。
